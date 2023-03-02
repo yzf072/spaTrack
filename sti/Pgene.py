@@ -87,14 +87,14 @@ def filter_gene(adata,min_exp_prop,abs_FC):
     Parameters
     ----------
     adata:
-          scanpy adata for infering trajectory
+        scanpy adata for infering trajectory
     
-    min_exp_prop: minimum expression proporation
+    min_exp_prop: 
+        minimum expression proporation
 
-    abs_FC: log2 |FC| in differential expression
-
+    abs_FC: 
+        log2_FC in differential expression
     """
-
     ptime_list = list(adata.obs['ptime'])
     if sorted(ptime_list) == ptime_list:
         pass

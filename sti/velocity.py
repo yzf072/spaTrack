@@ -9,7 +9,9 @@ import ot
 from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
 from scipy.stats import norm
-from typing import Optional
+from typing import Optional,Union
+from numpy.random import RandomState
+import sys
 
 from sti.utils import nearest_neighbors, kmeans_centers
 
@@ -64,13 +66,44 @@ def plot(
 
 def get_ot_matrix(
     adata: AnnData,
-    data_type: Literal["spatial", "single-cell"] = "single-cell",
+    data_type: str,
     alpha1: int = 1,
     alpha2: int = 1,
-):
+    random_state: Union[None,int,RandomState] = 0
+) -> np.ndarray:
+    """
+    Calculate transfer probabilities between cells.
+    
+    Using optimal transport theory based on gene expression and/or spatial location information.
+
+    Parameters
+    ----------
+    adata
+        An :class:`~anndata.AnnData` object.
+    data_type
+        The type of sequencing data.
+
+        (1) ``'spatial'``: for the spatial transcriptome data.
+        (2) ``'single-cell'``: for the single-cell sequencing data.
+
+    alpha1
+        The proportion of spatial location information.
+        (Default: 1)
+    alpha2
+        The proportion of gene expression information.
+        (Default: 1)
+    random_state
+        Different initial states for the pca.
+        (Default: 0)
+
+    Returns
+    -------
+    :class:`~numpy.ndarray`
+        Cell transition probability matrix.
+    """
     if "X_pca" not in adata.obsm:
         print("X_pca is not in adata.obsm, automatically do PCA first.")
-        sc.tl.pca(adata, svd_solver="arpack")
+        sc.tl.pca(adata, svd_solver="arpack",random_state=random_state)
     newdata = adata.obsm["X_pca"]
     newdata2 = newdata.copy()
 
@@ -96,13 +129,16 @@ def get_ot_matrix(
         M /= M.max()
         row, col = np.diag_indices_from(M)
         M[row, col] = M.max() * 1000000
+    
+    else:
+        sys.exit("Please give the right data type, choose from 'spatial' and 'single-cell'.")
 
     a, b = (
         np.ones((adata.n_obs,)) / adata.n_obs,
         np.ones((adata.n_obs,)) / adata.n_obs,
     )
     lambd = 1e-1
-    Gs = ot.sinkhorn(a, b, M, lambd)
+    Gs = np.array(ot.sinkhorn(a, b, M, lambd))
 
     return Gs
 
@@ -168,65 +204,72 @@ def selected_info(index):
 
 def set_start_cells(
     adata,
-    select_way: Literal["cell_type", "coordinates", "partition"],
-    cell_type=None,
-    up=float("inf"),
-    down=float("-inf"),
-    left=float("-inf"),
-    right=float("inf"),
-    basis="spatial",
-    n_neigh=5,
-    cluster_centers=None,
-    n_clusters=2,
-):
-    """Artificially set start cells
+    select_way: str,
+    boundary: list=[float("inf")]*4,
+    cell_type:Union[None,str]=None,
+    basis:str="spatial",
+    partition: bool=False,
+    n_clusters: int =2,
+    n_neigh:int = 5,
+) -> list:
+    """
+    Artificially set start cells.
 
     Parameters
     ----------
     adata
-        anndata
+        An :class:`~anndata.AnnData` object.
     select_way
-        The way to select the starting cells, including cell type and coordinates
-    cell_type, optional
-        Give out the selected starting cell type when the `select_way` is 'cell_type', by default None
-    up, optional
-        Upper bound of coordinates, by default float('inf')
-    down, optional
-        Lower bound of coordinates, by default float('-inf')
-    left, optional
-        Left bound of coordinates, by default float('-inf')
-    right, optional
-        Right bound of coordinates, by default float('inf')
+        The way to select the starting cells.
+
+        (1) ``'cell_type'``: by the cell type.
+        (2) ``'coordinates'``: by position coordinates.
+
+    boundary
+        Give out the boundary when the `select_way` is 'coordinates'.
+        The upper, lower, left, and right borders are stored in the list respectively.
+    cell_type
+        Give out the selected starting cell type when the `select_way` is 'cell_type'.
+        (Deafult: None)
+    basis
+        The basis stores location information.
+    partition
+        Whether to partition the specific type of cells into several small clusters according to density to get cluster centers.
+    n_clsuters
+        The number of cluster centers to repartition.
+    n_neigh
+        The number of neighbors next to the cluster center selected as the starting cell.
 
     Returns
     -------
-        Give out the index of the selected starting  cells
+    list
+        Give out the index of the selected starting cells.
     """
-    if select_way == "number":
+    if select_way == "coordinates":
         select = (
-            (adata.obsm["spatial"][:, 0] > left)
-            & (adata.obsm["spatial"][:, 0] < right)
-            & (adata.obsm["spatial"][:, 1] < up)
-            & (adata.obsm["spatial"][:, 1] > down)
+            (adata.obsm["X_" + basis][:, 1] < boundary[0])
+            & (adata.obsm["X_" + basis][:, 1] > boundary[1])
+            & (adata.obsm["X_" + basis][:, 0] > boundary[2])
+            & (adata.obsm["X_" + basis][:, 0] < boundary[3])
         )
         start_cells = np.where(select)[0].tolist()
     elif select_way == "cell_type":
+        if cell_type==None:
+            sys.exit("In 'cell_type' select way, `cell_type` cannot be None.")
+
         start_cells = np.where(adata.obs["cluster"] == cell_type)[0].tolist()
-    elif select_way == "partition":
-        if cell_type == None:
-            mask = np.array([True] * adata.n_obs)
-        else:
+        
+        if partition==True:
             mask = adata.obs["cluster"] == cell_type
 
-        if cluster_centers is None:
             cell_coords = adata.obsm["X_" + basis][mask]
             cluster_centers = kmeans_centers(cell_coords, n_clusters=n_clusters)
 
-        select_cluster_coords = adata.obsm["X_" + basis].copy()
-        select_cluster_coords[np.logical_not(mask)] = 1e10
-        start_cells = nearest_neighbors(
-            cluster_centers, select_cluster_coords, n_neigh
-        ).flatten()
+            select_cluster_coords = adata.obsm["X_" + basis].copy()
+            select_cluster_coords[np.logical_not(mask)] = 1e10
+            start_cells = nearest_neighbors(
+                cluster_centers, select_cluster_coords, n_neigh
+            ).flatten()
 
     return start_cells
     # elif select_way == 'lasso':
@@ -255,19 +298,21 @@ def set_start_cells(
     #     )
 
 
-def get_ptime(adata, start_cells):
-    """Get the cell ptime according to the choose of start cells
+def get_ptime(adata: AnnData, start_cells: np.ndarray):
+    """
+    Get the cell pseudotime based on transition probabilities from initial cells.
 
     Parameters
     ----------
     adata
-        anndata
+        An :class:`~anndata.AnnData` object.
     start_cells
-        Selected starting cells
+        List of index numbers of starting cells.
 
     Returns
     -------
-        pd.Series: Ptime correspongding to the cell
+    :class:`~numpy.ndarray`
+        Ptime correspongding to cells.
     """
     select_trans = adata.obsp["trans"][start_cells]
     adata.obs["tran"] = np.sum(select_trans, axis=0)
@@ -281,27 +326,31 @@ def get_ptime(adata, start_cells):
     return ptime.values
 
 
-def get_neigh_trans(adata, basis, n_neigh_pos=10, n_neigh_gene=10):
-    """Get the transport neighbors from two ways, position and gene expression
+def get_neigh_trans(adata: AnnData, basis: str, n_neigh_pos: int =10, n_neigh_gene: int =0):
+    """
+    Get the transport neighbors from two ways, position and/or gene expression
 
     Parameters
     ----------
     adata
-        Annadata
+        An :class:`~anndata.AnnData` object.
     basis
         The basis used in visualizing the cell position
-    n_neigh_pos, optional
-        Number of neighbors based on cell positions such as spatial or umap coordinates, by default 10
-    n_neigh_gene, optional
-        Number of neighbors based on gene expression (PCA), by default 10
+    n_neigh_pos
+        Number of neighbors based on cell positions such as spatial or umap coordinates.
+        (Default: 10)
+    n_neigh_gene
+        Number of neighbors based on gene expression (PCA).
+        (Default: 0)
 
     Returns
     -------
-        Selected transport neighbors
+    :class:`~scipy.sparse._csr.csr_matrix`
+        A sparse matrix composed of transition probabilities of selected neighbor cells.
     """
     if n_neigh_pos == 0 and n_neigh_gene == 0:
         raise ValueError(
-            "the number of position neighbors and gene neighbors cannot be zero at the same time"
+            "the number of position neighbors and gene neighbors cannot be zero at the same time."
         )
 
     if n_neigh_pos:
@@ -321,9 +370,10 @@ def get_neigh_trans(adata, basis, n_neigh_pos=10, n_neigh_gene=10):
             # neigh_pos_list.append(idx)
 
     if n_neigh_gene:
-        # if "pca" not in adata.uns.keys():
-        sc.tl.pca(adata)
-        sc.pp.neighbors(adata, n_neighbors=n_neigh_gene, n_pcs=30, knn=True)
+        if "X_pca" not in adata.obsm:
+            print("X_pca is not in adata.obsm, automatically do PCA first.")
+            sc.tl.pca(adata)
+        sc.pp.neighbors(adata, use_rep='X_pca', key_added='X_pca',n_neighbors=n_neigh_gene)
 
         neigh_gene = adata.obsp["distances"].indices.reshape(
             -1, adata.uns["neighbors"]["params"]["n_neighbors"] - 1
@@ -348,36 +398,42 @@ def get_neigh_trans(adata, basis, n_neigh_pos=10, n_neigh_gene=10):
             / (adata.obsp["trans"][i][n_all].sum())  # normalize
         )
 
-    trans_neigh = csr_matrix(
+    trans_neigh_csr = csr_matrix(
         (csr_data, indices, indptr), shape=(adata.n_obs, adata.n_obs)
     )
 
-    return trans_neigh, trans_neigh.A
+    return trans_neigh_csr
 
 
-def get_velocity(adata, basis, n_neigh_pos=10, n_neigh_gene=10):
-    """Get the velocity of each cell. The speed can be determined in terms of cell location and gene expression
+def get_velocity(adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene: int =0):
+    """
+    Get the velocity of each cell.
+    
+    The speed can be determined in terms of the cell location and/or gene expression.
 
     Parameters
     ----------
     adata
-        Anndata
+        An :class:`~anndata.AnnData` object.
     basis
-        The label of cell coordinates, for example, `umap` or `spatial`
-    n_neigh_pos, optional
-        Number of neighbors based on cell positions such as spatial or umap coordinates, by default 10
-    n_neigh_gene, optional
-        Number of neighbors based on gene expression (PCA), by default 10
+        The label of cell coordinates, for example, `umap` or `spatial`.
+    n_neigh_pos
+        Number of neighbors based on cell positions such as spatial or umap coordinates.
+        (Default: 10)
+    n_neigh_gene
+        Number of neighbors based on gene expression.
+        (Default: 0)
 
     Returns
     -------
-        The cell velocity on each grid to draw the streamplot figure
+    tuple
+        The grid coordinates and cell velocities on each grid to draw the streamplot figure.
     """
-    adata.obsp["trans_neigh_csr"], adata.obsp["trans_neigh"] = get_neigh_trans(
+    adata.obsp["trans_neigh_csr"] = get_neigh_trans(
         adata, basis, n_neigh_pos, n_neigh_gene
     )
+
     position = adata.obsm["X_" + basis]
-    # 求出估计速度ff
     V = np.zeros(position.shape)  # 速度为2维
 
     for cell in range(adata.n_obs):  # 循环每个细胞
@@ -386,7 +442,7 @@ def get_velocity(adata, basis, n_neigh_pos=10, n_neigh_gene=10):
         x1 = position[cell][0]  # 初始化细胞坐标
         y1 = position[cell][1]
         for neigh in adata.obsp["trans_neigh_csr"][cell].indices:  # 针对每个邻居
-            p = adata.obsp["trans_neigh"][cell][neigh]
+            p = adata.obsp["trans_neigh_csr"][cell,neigh]
             if (
                 adata.obs["ptime"][neigh] < adata.obs["ptime"][cell]
             ):  # 若邻居的ptime小于当前的，则概率反向
