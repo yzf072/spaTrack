@@ -82,27 +82,27 @@ Filter genes by minimum expression proporation and cluster differential expressi
 Cluster differential expression is used to as a reference to order gene.
 """
 
-def filter_gene(adata,min_exp_prop,abs_FC):
+def filter_gene(adata,min_exp_prop,hvg_gene=2000):
     """
     Parameters
     ----------
     adata:
-        scanpy adata for infering trajectory
+          scanpy adata for infering trajectory
     
-    min_exp_prop: 
-        minimum expression proporation
+    min_exp_prop: minimum expression proporation
 
-    abs_FC: 
-        log2_FC in differential expression
+    abs_FC: log2 |FC| in differential expression
+
     """
+
     ptime_list = list(adata.obs['ptime'])
     if sorted(ptime_list) == ptime_list:
         pass
     else:
-        raise Exception ('error: Please sort adata by ptime')
+        raise Exception ('error ： Please sort adata by ptime')
         
     cluster_order = adata.obs.groupby(['cluster']).mean().sort_values(['ptime']).index
-
+    print('cluter ordered by ptime : ',list(cluster_order))
     ptime_sort_matrix = adata.X.copy()
     df_exp = pd.DataFrame(
         data=ptime_sort_matrix, 
@@ -114,33 +114,37 @@ def filter_gene(adata,min_exp_prop,abs_FC):
     ##minimum expression proporation
     min_prop_filter=df_exp[df_exp.columns[(df_exp>0).sum(axis=0)>int(len(adata)*min_exp_prop)]]
 
-    ##cluster differential expression
-    sc.tl.rank_genes_groups(adata, 'cluster', method='wilcoxon')
-    result = adata.uns['rank_genes_groups']
-    groups = result['names'].dtype.names
-    df_diff_res = pd.DataFrame(
-        {group + '_' + key[:1]: result[key][group]
-        for group in groups for key in ['names', 'pvals_adj','logfoldchanges']})
-    diff_gene_list=list()
+    sc.pp.highly_variable_genes(adata,n_top_genes=hvg_gene)
 
-    print('The cluster order is:',end=' ')
-    for cluster_name in cluster_order:
-        print(cluster_name,end=' ')
-        df_cluster_diff = df_diff_res.loc[df_diff_res[cluster_name+'_p']<0.01].sort_values([cluster_name+'_l'],ascending=False)
-        gene_list1 = df_cluster_diff.loc[df_cluster_diff[cluster_name+'_l']>abs_FC][cluster_name+'_n']
-        diff_gene_list = diff_gene_list+list(gene_list1)
-    gene_list_lm=set(diff_gene_list).intersection(set(list(min_prop_filter.columns)))
+
+    ##cluster differential expression
+   # sc.tl.rank_genes_groups(adata, 'cluster', method='wilcoxon')
+   # result = adata.uns['rank_genes_groups']
+   # groups = result['names'].dtype.names
+   # df_diff_res = pd.DataFrame(
+   #     {group + '_' + key[:1]: result[key][group]
+   #     for group in groups for key in ['names', 'pvals_adj','logfoldchanges']})
+   # diff_gene_list=list()
+   # for cluster_name in cluster_order:
+   #     print(cluster_name)
+   #     df_cluster_diff = df_diff_res.loc[df_diff_res[cluster_name+'_p']<0.01].sort_values([cluster_name+'_l'],ascending=False)
+   #     gene_list1 = df_cluster_diff.loc[df_cluster_diff[cluster_name+'_l']>abs_FC][cluster_name+'_n']
+   #     diff_gene_list = diff_gene_list+list(gene_list1)
     
+    #gene_list_lm=set(diff_gene_list).intersection(set(list(min_prop_filter.columns)))
+    gene_list_lm=np.intersect1d(min_prop_filter.columns,adata[:,adata.var.highly_variable].var_names)
     adata_filter = adata[:,min_prop_filter.columns]
     adata_filter.uns['gene_list_lm'] = gene_list_lm
-    adata_filter.uns['diff_gene_list'] = diff_gene_list
+    #adata_filter.uns['diff_gene_list'] = diff_gene_list
+    print('Cell number'+'\t'+str(len(adata_filter)))
+    print('Gene number'+'\t'+str(len(gene_list_lm)))
     return adata_filter
 
 
 """
 Function:
 
-Called function  by  ptime_gene_GAM() for multi-process computing
+Fit GAM model by formula gene_exp ~ Ptime
 
 """
 def GAM_gene_fit(exp_gene_list):
@@ -167,7 +171,7 @@ def GAM_gene_fit(exp_gene_list):
     x = df_new[["ptime"]].values
     y = df_new[gene]
     gam = LinearGAM(s(0, n_splines=8))
-    gam_fit=gam.gridsearch(x, y,progress=False)
+    gam_fit=gam.gridsearch(x, y)
     grid_X = gam_fit.generate_X_grid(term=0)
     r_list.append(gam_fit.statistics_['pseudo_r2']['explained_deviance'])
     pvalue_list.append(gam_fit.statistics_['p_values'][0])
@@ -188,7 +192,7 @@ def GAM_gene_fit(exp_gene_list):
 """
 function:
 
-perform GAM model fitted by ways of multi-process computing
+Call ptime_gene_GAM() by  multi-process computing to improve operational speed
 
 """
 
@@ -216,7 +220,6 @@ def ptime_gene_GAM(adata,
     
     """
     ##perform GAM model on each gene
-    #min_prop_filter,gene_list_for_gam,diff_gene_list = filter_gene(adata,min_exp_prop,abs_FC)
     gene_list_for_gam = adata.uns['gene_list_lm']
     
     df_exp_filter = pd.DataFrame(
@@ -225,13 +228,13 @@ def ptime_gene_GAM(adata,
         columns = adata.var.index
     )
 
-    print('The number of genes for GAM model: ',len(gene_list_for_gam))
+    print('Genes number fitted by GAM model:  ',len(gene_list_for_gam))
     if core_number >=1:
         para_list=list()
         for gene in gene_list_for_gam:
             df_new=pd.DataFrame({'ptime':list(adata.obs["ptime"]),
                                gene:list(df_exp_filter[gene])})
-            df_new=df_new.loc[df_new[gene]>0]
+            #df_new=df_new.loc[df_new[gene]>0]
             para_list.append((df_new,gene))
         p = mp.Pool(core_number)
         df_res = p.map(GAM_gene_fit,para_list)
@@ -246,56 +249,119 @@ def ptime_gene_GAM(adata,
     df_res.index=list(df_res['gene'])
     return df_res
 
+
+
 """
 function:
 
-order gene by cluster's log2FC sorted by ptime
+Split cells sorted by ptime into widonws.
+
+Order genes according number id of the maximum expression window
 
 """
 
-def order_trajectory_genes(adata,df_sig_res):
+def order_trajectory_genes(adata,
+                            df_sig_res,
+                            cell_number):
+
+
     """
     Parameters
     ----------
     adata : AnnData object
-          filtered adata 
-          
-            
+            filtered adat 
+  
     df_sig_res: dataframe
-           return dataframe by ptime_gene_GAM() after filtering as significat gene dataframe
-    
-    Return
-    ----------
-    sig_gene_exp_order: dataframe 
-            gene ordered expression dataframe for plotting heatmap 
+             return dataframe by ptime_gene_GAM() after filtering as significat gene dataframe
 
-    """ 
-    #min_prop_filter,gene_list,diff_gene_list = filter_gene(adata,min_exp_prop)
-    
-    df_exp_filter = pd.DataFrame(
-         data = adata.X,
-         index = adata.obs.index,
-         columns = adata.var.index
-     )
+    cell_number: int ,number
+              Cell number within splited window
 
-    sig_gene_exp = df_exp_filter.loc[:, df_sig_res.index]
-    ##sort gene by cluster differertial genes
-    df1=pd.DataFrame ({'gene_name':adata.uns['diff_gene_list']})
-    df2=pd.DataFrame({'gene_name':list(sig_gene_exp.columns)})
-    ##sort df2 by df1 order
-    df_merge=pd.merge(df1,df2,on=['gene_name'])
-    
-    order_list=list(df_merge.drop_duplicates()['gene_name'])
-    sig_gene_exp_order = sig_gene_exp[order_list]
-    
-    return sig_gene_exp_order
+    Returns
+    -------
+    df_one_cell_exp_sort: dataframe
+            Columns:Sortted significant genes expression matrix according to mean expression value in windows
+            Index: cell_id
 
+    """
+
+    
+    ptime_sort_exp_matrix = adata.X.copy()
+   
+    df_exp_filter = pd.DataFrame (
+    
+                    data=ptime_sort_exp_matrix, 
+                    index=adata.obs.index, 
+                    columns=adata.var.index
+
+                    )
+    
+    df_one_cell_exp_sig = df_exp_filter.loc[:, df_sig_res.index] 
+    sig_genes=df_one_cell_exp_sig.columns
+    max_cell = pd.DataFrame(index=sig_genes, columns=["max"])
+    df_one_cell_exp_matrix = np.array(df_one_cell_exp_sig)
+
+     # windows number 
+    window_number = math.ceil(len(df_one_cell_exp_sig) / cell_number)
+
+    df_one_cell_exp_matrix.resize(
+        (cell_number * window_number, len(sig_genes)), refcheck=False
+    )
+    # divide block 
+    block_matrix = df_one_cell_exp_matrix.reshape(
+        (window_number, cell_number, len(sig_genes))
+    )
+    window_matrix = np.sum(block_matrix, axis=1)
+
+    
+    # cell number in each window
+    cell_in_window = np.array(
+        [[cell_number]] * (window_number - 1)
+        + [[len(df_one_cell_exp_sig) - cell_number * (window_number - 1)]]
+    )
+
+    # mean expression in each window
+    mean_window_matrix = window_matrix / cell_in_window
+    window_exp = pd.DataFrame(
+        data=mean_window_matrix,
+        index=["window_" + str(i) for i in range(window_number)],
+        columns=sig_genes,
+    )
+
+
+    for i in sig_genes:
+        max_cell.loc[i, "max"] = window_exp[i].idxmax()
+
+    ptime = np.array(adata.obs["ptime"])
+    ptime.resize((window_number, cell_number), refcheck=False)
+    mean_ptime = ptime.sum(axis=1) / cell_in_window.T
+    endog = pd.DataFrame(
+        data=mean_ptime.T,
+        index=["window_" + str(i) for i in range(window_number)],
+        columns=["ptime"],
+    )
+    max_cell["ptime"] = endog.loc[max_cell["max"].values].values
+    max_cell = max_cell.iloc[np.argsort(max_cell["ptime"].values), :]
+    sort_window_exp = window_exp.loc[:, max_cell.index]
+    print('Finally selected',len(sort_window_exp.columns),'genes.')
+    ## return gene order  
+    gene_sort_list=sort_window_exp.columns
+    df_one_cell_exp_sort=df_one_cell_exp_sig[gene_sort_list]
+    return df_one_cell_exp_sort
+
+"""
+function:
+
+Plot ordered gene expression heatmap of the selected candidate trajectory genes
+
+"""
 
 
 def plot_trajectory_gene_heatmap(sig_gene_exp_order,
                  smooth_length,
                  #TF=False,
-                 cmap_name= 'twilight_shifted'):
+                 cmap_name= 'twilight_shifted',
+                 gene_label_size=30):
     """
     Parameters
     ----------
@@ -312,9 +378,8 @@ def plot_trajectory_gene_heatmap(sig_gene_exp_order,
         Heatmap: column represents cells, index is genes
 
     """
-        # z-score,normaliz data
     ## only show TF gene 
-    #TF_file=pd.read_table('/hwfssz1/ST_SUPERCELLS/P21Z10200N0134/USER/huangke2/27.spatial.trajectory/09.sti.code/hs_hgnc_tfs.txt',header=None)
+    #TF_file=pd.read_table('hs_hgnc_tfs.txt',header=None)
     #cell_TF_exp=cell_exp[cell_exp.columns[cell_exp.columns.isin(TF_file[0])]]
 
     sort_window_exog_z = stats.zscore(sig_gene_exp_order, axis=0)
@@ -339,7 +404,7 @@ def plot_trajectory_gene_heatmap(sig_gene_exp_order,
                      cmap=cmap_name,
                        cbar_kws={'shrink': 0.3,'label': 'normalized expression'})
     cbar =  pseudotime_gene_heatmap.collections[0].colorbar
-    cbar.ax.tick_params(labelsize=18)
+    cbar.ax.tick_params(labelsize=22)
     ## add cell type 
     #df_cell=pd.DataFrame(sig_gene_exp_order.index)
     #df_cell[1]=list(adata.obs['cluster'])
@@ -352,13 +417,17 @@ def plot_trajectory_gene_heatmap(sig_gene_exp_order,
     pseudotime_gene_heatmap.figure.axes[-1].yaxis.label.set_size(25)
     pseudotime_gene_heatmap.xaxis.tick_top()
     pseudotime_gene_heatmap.set_xticks([])
-    pseudotime_gene_heatmap.yaxis.set_tick_params(labelsize=13)
+    pseudotime_gene_heatmap.yaxis.set_tick_params(labelsize=gene_label_size)
     plt.xticks(rotation=90)
     return fig.tight_layout()
 
 
+"""
+function:
 
-##plot example genes
+Plot one trajectory gene
+
+"""
 def plot_trajectory_gene(adata,
                          gene_name,
                          line_width=5,
@@ -391,12 +460,12 @@ def plot_trajectory_gene(adata,
     df_new=pd.DataFrame({'ptime':list(adata.obs["ptime"]),
                          gene_name:list(gene_expression[gene_name]),
                         'cell_type':list(adata.obs["cluster"])})
-    df_new=df_new.loc[df_new[gene_name]>0]
+    #df_new=df_new.loc[df_new[gene_name]>0]
     x_ptime = df_new[["ptime"]].values
     y_exp = df_new[gene_name]
     gam = LinearGAM(s(0, n_splines=10))
     gam_res=gam.gridsearch(x_ptime, 
-                           y_exp,progress=False)
+                           y_exp)
     
     fig, axs = plt.subplots(figsize=(10, 8))
     XX = gam_res.generate_X_grid(term=0)
@@ -432,7 +501,12 @@ def plot_trajectory_gene(adata,
     plt.yticks(fontsize=18)
     return axs
 
+"""
+funtion:
 
+Plot a group of trajectory genes
+
+"""
 
 def plot_trajectory_gene_list(adata,
                               gene_name_list,
@@ -497,7 +571,7 @@ def plot_trajectory_gene_list(adata,
             df_new=pd.DataFrame({'ptime':list(adata.obs["ptime"]),
                                  gene_name:list(gene_expression[gene_name])}
                                )
-            df_new=df_new.loc[df_new[gene_name]>0]
+            #df_new=df_new.loc[df_new[gene_name]>0]
             x_ptime = df_new[["ptime"]].values
             y_exp = df_new[gene_name]
             gam = LinearGAM(s(0, 
@@ -536,16 +610,21 @@ def plot_trajectory_gene_list(adata,
 
 
 
-##GAM 
-##sig_gene_exp_order,df_res = ptime_gene_GAM(adata,min_exp_prop=0.2,mode_fit=0.2,FDR=0.05 )
-##plot
-##plot_trajectory_gene_heatmap(sig_gene_exp_order,
-##                 smooth_length=600,
-##                 #TF=False,
-##                 cmap_name='twilight_shifted')
-##                  #'seismic')
-##plt.savefig('./heatmap.pdf')
+#01 filter gene by expression 
+#sub_adata=sti.Pgene.filter_gene(sub_adata,min_exp_prop=0.1,hvg_gene=3000)
 
-#plot_trajectory_gene(adata,'MPO',show_cell_type=True)
-#gene_list=['MPO','IL18','LYZ','ELP2']
-#plot_trajectory_gene_list(adata,gene_list,col_num=2)
+#02 fit GAM model
+#df_res  = sti.Pgene.ptime_gene_GAM(sub_adata,core_number=5)
+
+#03 filter gene by GAM model indicators
+#df_sig_res = df_res.loc[(df_res['model_fit']>0.05) & (df_res['fdr']<0.05)]
+
+#04 order trajectory genes
+#sort_exp_sig = sti.Pgene.order_trajectory_genes(sub_adata,df_sig_res,cell_number=20)
+
+#05 plot trajectory gene heatmap 
+#sti.Pgene.plot_trajectory_gene_heatmap(sort_exp_sig,smooth_length=100,gene_label_size=20)
+
+#06 plot one or multiple trajectory genes
+#sti.Pgene.plot_trajectory_gene(sub_adata,gene_name='APOE',show_cell_type=False)
+#sti.Pgene.plot_trajectory_gene_list(sub_adata,gene_name_list=['COL1A1','ACTB','TNC','AQP1'],col_num=2)
