@@ -619,96 +619,77 @@ class Lasso:
     """
 
     __sub_index = []
-    sub_adata = None
+    # sub_adata = None
+    sub_cells=[]
 
     def __init__(self, adata):
-        """
-        Args:
-            adata: An Anndata object.
-        """
         self.adata = adata
 
     def vi_plot(
         self,
-        key="spatial",
-        group: Optional[str] = None,
-        group_color: Optional[dict] = None,
+        basis="X_spatial",
     ):
-        """Plot spatial cluster result and lasso ROI.
-        Args:
-            key: The column key in .obsm, default to be 'spatial'.
-            group: The column key/name that identifies the grouping information
-                (for example, clusters that correspond to different cell types)
-                of buckets.
-            group_color: The key in .uns, corresponds to a dictionary that map group names to group colors.
-        Returns:
-            sub_adata: subset of adata.
-        """
-        if group not in self.adata.obs.keys():
-            raise ValueError(f"adata.obs doesn't have {group}.")
+        cell_types = self.adata.obs['cluster'].unique()
+        colors = sns.color_palette(n_colors=len(cell_types)).as_hex()
+        cluster_color = dict(zip(cell_types, colors))
+        self.adata.uns['cluster_color'] = cluster_color
 
-        if group_color==None:
-            cell_types = self.adata.obs['cluster'].unique()
-            colors = sns.color_palette(n_colors=len(cell_types)).as_hex()
-            group_color = dict(zip(cell_types, colors))
-            self.adata.uns['group_colors'] = group_color
+        df = pd.DataFrame()
+        df["group_ID"] = self.adata.obs_names
+        df["labels"] = self.adata.obs['cluster'].values
+        df["spatial_0"] = self.adata.obsm[basis][:, 0]
+        df["spatial_1"] = self.adata.obsm[basis][:, 1]
+        df["color"] = df.labels.map(self.adata.uns['cluster_color'])
 
-        if group and group_color:
+        py.init_notebook_mode()
 
-            df = pd.DataFrame()
-            df["group_ID"] = self.adata.obs_names
-            df["labels"] = self.adata.obs[group].values
-            df["spatial_0"] = self.adata.obsm[key][:, 0]
-            df["spatial_1"] = self.adata.obsm[key][:, 1]
-            df["color"] = df.labels.map(self.adata.uns[group_color])
+        f = go.FigureWidget(
+            [go.Scatter(x=df["spatial_0"], y=df["spatial_1"], mode="markers", marker_color=df["color"])]
+        )
+        scatter = f.data[0]
+        f.layout.plot_bgcolor = "rgb(255,255,255)"
+        f.layout.autosize = False
 
-            py.init_notebook_mode()
+        axis_dict = dict(
+            showticklabels=True,
+            autorange=True,
+        )
+        f.layout.yaxis = axis_dict
+        f.layout.xaxis = axis_dict
+        f.layout.width = 600
+        f.layout.height = 600
 
-            f = go.FigureWidget(
-                [go.Scatter(x=df["spatial_0"], y=df["spatial_1"], mode="markers", marker_color=df["color"])]
-            )
-            scatter = f.data[0]
-            scatter.marker.opacity = 0.5
-            f.layout.plot_bgcolor = "rgb(255,255,255)"
-            f.layout.autosize = False
+        # Create a table FigureWidget that updates on selection from points in the scatter plot of f
+        t = go.FigureWidget(
+            [
+                go.Table(
+                    header=dict(
+                        values=["group_ID", "labels", "spatial_0", "spatial_1"],
+                        fill=dict(color="#C2D4FF"),
+                        align=["left"] * 5,
+                    ),
+                    cells=dict(
+                        values=[df[col] for col in ["group_ID", "labels", "spatial_0", "spatial_1"]],
+                        fill=dict(color="#F5F8FF"),
+                        align=["left"] * 5,
+                    ),
+                )
+            ]
+        )
 
-            axis_dict = dict(
-                showticklabels=False,
-                autorange=True,
-            )
-            f.layout.yaxis = axis_dict
-            f.layout.xaxis = axis_dict
+        def selection_fn(trace, points, selector):
 
-            # Create a table FigureWidget that updates on selection from points in the scatter plot of f
-            t = go.FigureWidget(
-                [
-                    go.Table(
-                        header=dict(
-                            values=["group_ID", "labels", "spatial_0", "spatial_1"],
-                            fill=dict(color="#C2D4FF"),
-                            align=["left"] * 5,
-                        ),
-                        cells=dict(
-                            values=[df[col] for col in ["group_ID", "labels", "spatial_0", "spatial_1"]],
-                            fill=dict(color="#F5F8FF"),
-                            align=["left"] * 5,
-                        ),
-                    )
-                ]
-            )
+            t.data[0].cells.values = [
+                df.loc[points.point_inds][col] for col in ["group_ID", "labels", "spatial_0", "spatial_1"]
+            ]
 
-            def selection_fn(trace, points, selector):
+            Lasso.__sub_index = t.data[0].cells.values[0]
+            # Lasso.sub_adata = self.adata[
+            #     Lasso.__sub_index,
+            # ]
+            Lasso.sub_cells=np.where(self.adata.obs.index.isin(Lasso.__sub_index))[0]
 
-                t.data[0].cells.values = [
-                    df.loc[points.point_inds][col] for col in ["group_ID", "labels", "spatial_0", "spatial_1"]
-                ]
+        scatter.on_selection(selection_fn)
 
-                Lasso.__sub_index = t.data[0].cells.values[0]
-                Lasso.sub_adata = self.adata[
-                    Lasso.__sub_index,
-                ]
-
-            scatter.on_selection(selection_fn)
-
-            # Put everything together
-            return VBox((f, t))
+        # Put everything together
+        return VBox((f, t))
