@@ -1,3 +1,5 @@
+import ot
+import sys
 import scanpy as sc
 import pandas as pd
 import numpy as np
@@ -5,19 +7,17 @@ from anndata import AnnData
 import matplotlib.pyplot as plt
 from typing_extensions import Literal
 from sklearn.metrics.pairwise import euclidean_distances
-import ot
 from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
 from scipy.stats import norm
 from typing import Optional,Union
 from numpy.random import RandomState
-import sys
 import plotly.graph_objs as go
 import plotly.offline as py
 from ipywidgets import VBox
 import seaborn as sns
 
-from sti.utils import nearest_neighbors, kmeans_centers
+from .utils import nearest_neighbors, kmeans_centers
 
 
 def read_file(expr, coor, annotation, cell_id, gene_id):
@@ -168,44 +168,6 @@ def select_cluster(
     return select
 
 
-def get_cmap(n, name="hsv"):
-    """Returns a function that maps each index in 0, 1, ..., n-1 to a distinct
-    RGB color; the keyword argument name must be a standard mpl colormap name."""
-    return plt.cm.get_cmap(name, n)
-
-
-def save_coordinate(df, selection, filename, sep="\t"):
-    df_select = df.iloc[selection.index]
-    df_select.to_csv(filename, sep="\t")
-
-
-def save_results():
-    option = input("Save your the results? Y/N:  ")
-    if option == "Y":
-        filename = input(
-            "Please give the name of the coordiante file, e.g filename.csv:  "
-        )
-        save_coordinate(df, selection, filename=filename)
-    else:
-        print("The results will be discarded!")
-
-
-def selected_info(index):
-    # Write function that uses the selection indices to slice points and compute stats
-    selected = points.iloc[index]
-    if index:
-        print(selected.array())
-        #         label = 'Mean x, y: %.3f, %.3f' % tuple(selected.array().mean(axis=0))
-        label = "Mean x, y: %.3f, %.3f" % tuple(
-            selected.array()[:, [0, 1]].mean(axis=0)
-        )  # 选则前两列计算x和y
-
-    else:
-        label = "No selection"
-    type(selected.relabel(label))
-    return selected.relabel(label).opts(color="color")
-
-
 def set_start_cells(
     adata,
     select_way: str,
@@ -276,30 +238,6 @@ def set_start_cells(
             ).flatten()
 
     return start_cells
-    # elif select_way == 'lasso':
-    #     data = {
-    #         'x_values': adata.obsm['spatial'][:, 0].tolist(),
-    #         'y_values': adata.obsm['spatial'][:, 1].tolist(),
-    #         'color': adata.obs['cluster'].tolist()
-    #     }
-    #     opts.defaults(
-    #         opts.Points(tools=['box_select', 'lasso_select'],
-    #                     nonselection_alpha=0.9))
-    #     points = hv.Points(data,
-    #                        kdims=['x_values', 'y_values'],
-    #                        vdims=['color']).opts(color='color',
-    #                                              width=700,
-    #                                              cmap='Category20',
-    #                                              height=700,
-    #                                              size=4.5)
-    #     selection = streams.Selection1D(source=points)
-
-    #     # Combine points and DynamicMap
-    #     return points,selection
-    # else:
-    #     raise KeyError(
-    #         f"'{select_way}' is not valid for start cells selecting. Please choose from 'lasso' and 'number'."
-    #     )
 
 
 def get_ptime(adata: AnnData, start_cells: np.ndarray):
@@ -619,7 +557,6 @@ class Lasso:
     """
 
     __sub_index = []
-    # sub_adata = None
     sub_cells=[]
 
     def __init__(self, adata):

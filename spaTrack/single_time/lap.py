@@ -10,6 +10,7 @@ from scipy.interpolate import interp1d
 import matplotlib
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+import scanpy as sc
 
 from .vectorfield import *
 from .utils import nearest_neighbors
@@ -367,6 +368,7 @@ def least_action(
     vecfld: Union[None, Callable] = None,
     adj_key: str = "pearson_transition_matrix",
     n_points: int = 25,
+    n_neighbors: int =100,
     init_paths: Union[None, np.ndarray, list] = None,
     D: int = 10,
     PCs: Union[None, str] = None,
@@ -374,6 +376,8 @@ def least_action(
     add_key: Union[None, str] = None,
     **kwargs,
 ):
+    sc.pp.neighbors(adata,use_rep='X_'+basis,key_added='X_'+basis,n_neighbors=n_neighbors)
+
     if vecfld is None:
         vf = SvcVectorField()
         vf.from_adata(adata, basis=basis, vf_key=vf_key)
@@ -551,16 +555,23 @@ class LeastActionPath(Trajectory):
         self.t = np.arange(self.X.shape[0]) * dt_sol
         return dt_sol
 
-def plot_least_action_path(adata,basis='spatial',ax=None):
+def plot_least_action_path(adata,basis='spatial',ax=None,
+        linewidth=3,
+        point_size=6,
+        linestyle='solid'
+    ):
     lap_dict=adata.uns['LAP_'+basis]
+    id_array=np.arange(0,len(lap_dict['prediction'][0]),2)
+    lap_point_pos = lap_dict['prediction'][0][id_array]
+    lap_value = lap_dict['action'][0][id_array]
 
-    minima=np.min(lap_dict['action'][0])
-    maxima=np.max(lap_dict['action'][0])
+    minima=np.min(lap_value)
+    maxima=np.max(lap_value)
     norm=matplotlib.colors.Normalize(vmin=minima,vmax=maxima,clip=True)
     mapper=cm.ScalarMappable(norm=norm,cmap=plt.get_cmap('hsv'))
 
-    cols=[mapper.to_rgba(v) for v in lap_dict['action'][0]]
+    cols=[mapper.to_rgba(v) for v in lap_value]
 
-    ax.scatter(*lap_dict['prediction'][0].T,c=cols)
-    ax.plot(*lap_dict['prediction'][0].T, c="k")
+    ax.plot(*lap_point_pos.T, c="k",linewidth= linewidth,linestyle=linestyle,zorder=3)
+    ax.scatter(*lap_point_pos.T, c=cols,s=point_size,zorder=2)
     return ax

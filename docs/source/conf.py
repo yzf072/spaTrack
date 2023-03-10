@@ -3,7 +3,7 @@ import sys
 sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
-import sti
+import spaTrack as spt
 
 project = 'spaTrack'
 copyright = '2023, Zhongfei Ye'

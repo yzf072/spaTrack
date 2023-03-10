@@ -15,6 +15,7 @@ Welcome to spaTrack's documentation!
    :hidden:
 
    notebooks/Apply_spaTrack_on_spatial_data
+   notebooks/Apply_spaTrack_on_spatial_data_v2
    notebooks/spaTracks_multiple_origins_processing
    notebooks/spaTrack_adapt_to_scRNAseq_data
 
