@@ -171,7 +171,8 @@ def select_cluster(
 def set_start_cells(
     adata,
     select_way: str,
-    boundary: list=[float("inf")]*4,
+    # boundary: list=[float("inf")]*4,
+    start_point:Optional[list]=None,
     cell_type:Union[None,str]=None,
     basis:str="spatial",
     partition: bool=False,
@@ -212,13 +213,22 @@ def set_start_cells(
         Give out the index of the selected starting cells.
     """
     if select_way == "coordinates":
-        select = (
-            (adata.obsm["X_" + basis][:, 1] < boundary[0])
-            & (adata.obsm["X_" + basis][:, 1] > boundary[1])
-            & (adata.obsm["X_" + basis][:, 0] > boundary[2])
-            & (adata.obsm["X_" + basis][:, 0] < boundary[3])
-        )
-        start_cells = np.where(select)[0].tolist()
+        # select = (
+        #     (adata.obsm["X_" + basis][:, 1] < boundary[0])
+        #     & (adata.obsm["X_" + basis][:, 1] > boundary[1])
+        #     & (adata.obsm["X_" + basis][:, 0] > boundary[2])
+        #     & (adata.obsm["X_" + basis][:, 0] < boundary[3])
+        # )
+        # start_cells = np.where(select)[0].tolist()
+        if start_point is None:
+            raise ValueError(f"start_point must be specified in the 'coordinates' mode.")
+        
+        start_cells=nearest_neighbors(start_point,adata.obsm['X_spatial'],n_neigh)[0]
+
+        if cell_type is not None:
+            type_cells=np.where(adata.obs['cluster']==cell_type)[0]
+            start_cells=sorted(set(start_cells).intersection(set(type_cells)))
+
     elif select_way == "cell_type":
         if cell_type==None:
             sys.exit("In 'cell_type' select way, `cell_type` cannot be None.")
@@ -565,6 +575,7 @@ class Lasso:
     def vi_plot(
         self,
         basis="X_spatial",
+        cell_type:Optional[str]=None,
     ):
         cell_types = self.adata.obs['cluster'].unique()
         colors = sns.color_palette(n_colors=len(cell_types)).as_hex()
@@ -621,10 +632,11 @@ class Lasso:
             ]
 
             Lasso.__sub_index = t.data[0].cells.values[0]
-            # Lasso.sub_adata = self.adata[
-            #     Lasso.__sub_index,
-            # ]
             Lasso.sub_cells=np.where(self.adata.obs.index.isin(Lasso.__sub_index))[0]
+
+            if cell_type is not None:
+                type_cells=np.where(self.adata.obs['cluster']==cell_type)[0]
+                Lasso.sub_cells=sorted(set(Lasso.sub_cells).intersection(set(type_cells)))
 
         scatter.on_selection(selection_fn)
 
