@@ -4,6 +4,7 @@ from .velocity import (
     get_ptime,
     get_velocity,
     Lasso,
+    auto_get_start_cluster,
 )
 
 from .lap import (
