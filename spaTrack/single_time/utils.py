@@ -7,15 +7,27 @@ def nearest_neighbors(coord, coords, n_neighbors=5):
     _,neighs=neigh.kneighbors(np.atleast_2d(coord))
     return neighs
 
-def kmeans_centers(coords, n_clusters=2):
+def kmeans_centers(coords: np.ndarray, n_clusters:int=2)->np.ndarray:
+    """
+    Use kmeans to find cluster centers based on coordinates.
+
+    Parameters
+    ----------
+    coords
+        Coordinates stored in a 2D array.
+    n_clusters
+        The number of cluster centers.
+        (Default: 2)
+
+    Returns
+    -------
+    np.ndarray
+        Centers of clusters.
+    """    
     cell_coordinates=coords
     kmeans = KMeans(n_clusters)
     kmeans.fit(cell_coordinates)
     cluster_centers = kmeans.cluster_centers_
-    print('kmean cluster centers:')
+    print('kmeans cluster centers:')
     list(map(print, cluster_centers))
     return cluster_centers
-
-def dbscan_centers(coords,eps,min_samples):
-    pass
-

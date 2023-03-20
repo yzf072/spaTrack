@@ -4,68 +4,18 @@ import scanpy as sc
 import pandas as pd
 import numpy as np
 from anndata import AnnData
-import matplotlib.pyplot as plt
-from typing_extensions import Literal
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
 from scipy.stats import norm
-from typing import Optional,Union
 from numpy.random import RandomState
 import plotly.graph_objs as go
 import plotly.offline as py
 from ipywidgets import VBox
 import seaborn as sns
+from typing import Optional, Union, Literal, Tuple, List
 
 from .utils import nearest_neighbors, kmeans_centers
-
-
-def read_file(expr, coor, annotation, cell_id, gene_id):
-    """read the expression matrix, coordinates, annotations,cell ids and gene ids
-
-    Args:
-        expr (str): path of the expression matrix
-        coor (str): path of cell coordinates
-        annotation (str): path of cell annotations, like cluster
-
-    Returns:
-        anndata: adata with X, cluster and coordinates
-    """
-    adata = sc.read(expr, cache=True)
-    coor = pd.read_table(coor, header=None)
-    annotation = pd.read_table(annotation, header=None).T
-    cell_id = pd.read_table(cell_id, header=None)
-    gene_id = pd.read_table(gene_id, header=None)
-
-    adata.obs["cluster"] = annotation.values
-    adata.obsm["spatial"] = np.array(coor)
-    adata.obs.index = cell_id[0].values
-    adata.var.index = gene_id[0].values
-
-    return adata
-
-
-def preprocess(adata, gene_in_min_cells=20):
-    sc.pp.filter_genes(adata, min_cells=gene_in_min_cells)  # 过滤基因
-    sc.pp.normalize_total(adata, target_sum=1e4)
-    sc.pp.log1p(adata)
-
-
-def plot(
-    adata,
-):
-    fig, axs = plt.subplots(ncols=2, nrows=2, figsize=(15, 15))
-    # fig.suptitle()
-    sc.pl.umap(
-        adata,
-        color="spatial",
-        size=20,
-        ax=axs[0][0],
-        legend_loc="on data",
-        legene_fontoutline=3,
-        show=False,
-        s=50,
-    )
 
 
 def get_ot_matrix(
@@ -73,11 +23,11 @@ def get_ot_matrix(
     data_type: str,
     alpha1: int = 1,
     alpha2: int = 1,
-    random_state: Union[None,int,RandomState] = 0
+    random_state: Union[None, int, RandomState] = 0,
 ) -> np.ndarray:
     """
     Calculate transfer probabilities between cells.
-    
+
     Using optimal transport theory based on gene expression and/or spatial location information.
 
     Parameters
@@ -87,8 +37,8 @@ def get_ot_matrix(
     data_type
         The type of sequencing data.
 
-        (1) ``'spatial'``: for the spatial transcriptome data.
-        (2) ``'single-cell'``: for the single-cell sequencing data.
+        - ``'spatial'``: for the spatial transcriptome data.
+        - ``'single-cell'``: for the single-cell sequencing data.
 
     alpha1
         The proportion of spatial location information.
@@ -107,7 +57,7 @@ def get_ot_matrix(
     """
     if "X_pca" not in adata.obsm:
         print("X_pca is not in adata.obsm, automatically do PCA first.")
-        sc.tl.pca(adata, svd_solver="arpack",random_state=random_state)
+        sc.tl.pca(adata, svd_solver="arpack", random_state=random_state)
     newdata = adata.obsm["X_pca"]
     newdata2 = newdata.copy()
 
@@ -133,9 +83,11 @@ def get_ot_matrix(
         M /= M.max()
         row, col = np.diag_indices_from(M)
         M[row, col] = M.max() * 1000000
-    
+
     else:
-        sys.exit("Please give the right data type, choose from 'spatial' and 'single-cell'.")
+        sys.exit(
+            "Please give the right data type, choose from 'spatial' or 'single-cell'."
+        )
 
     a, b = (
         np.ones((adata.n_obs,)) / adata.n_obs,
@@ -147,97 +99,68 @@ def get_ot_matrix(
     return Gs
 
 
-def select_cluster(
-    adata, up=float("inf"), down=float("-inf"), left=float("-inf"), right=float("inf")
-):
-    """choose the original cells
-
-    Args:
-        adata (anndata): anndata with
-        up, down, left, right (int): thresholds
-
-    Returns:
-        np.array: boolean array, length is the cell number
-    """
-    select = (
-        (adata.obsm["spatial"][:, 0] > left)
-        & (adata.obsm["spatial"][:, 0] < right)
-        & (adata.obsm["spatial"][:, 1] < up)
-        & (adata.obsm["spatial"][:, 1] > down)
-    )
-    return select
-
-
 def set_start_cells(
-    adata,
-    select_way: str,
-    # boundary: list=[float("inf")]*4,
-    start_point:Optional[list]=None,
-    cell_type:Union[None,str]=None,
-    basis:str="spatial",
-    partition: bool=False,
-    n_clusters: int =2,
-    n_neigh:int = 5,
+    adata: AnnData,
+    select_way: Literal["coordinates", "cell_type"],
+    cell_type: Optional[str] = None,
+    start_point: Optional[Tuple[int, int]] = None,
+    basis: str = "spatial",
+    split: bool = False,
+    n_clusters: int = 2,
+    n_neigh: int = 5,
 ) -> list:
     """
-    Artificially set start cells.
+    Use coordinates or cell type to manually select starting cells.
 
     Parameters
     ----------
     adata
         An :class:`~anndata.AnnData` object.
     select_way
-        The way to select the starting cells.
+        Ways to select starting cells.
 
-        (1) ``'cell_type'``: by the cell type.
-        (2) ``'coordinates'``: by position coordinates.
+        (1) ``'cell_type'``: select by cell type.
+        (2) ``'coordinates'``: select by coordinates.
 
-    boundary
-        Give out the boundary when the `select_way` is 'coordinates'.
-        The upper, lower, left, and right borders are stored in the list respectively.
     cell_type
-        Give out the selected starting cell type when the `select_way` is 'cell_type'.
+        Restrict the cell type of starting cells.
         (Deafult: None)
+    start_point
+        The coordinates of the start point in 'coordinates' mode.
     basis
-        The basis stores location information.
-    partition
-        Whether to partition the specific type of cells into several small clusters according to density to get cluster centers.
+        The basis in `adata.obsm` to store position information.
+    split
+        Whether to split the specific type of cells into several small clusters according to cell density.
     n_clsuters
-        The number of cluster centers to repartition.
+        The number of cluster centers after splitting.
     n_neigh
-        The number of neighbors next to the cluster center selected as the starting cell.
+        The number of neighbors next to the start point/cluster center selected as the starting cell.
 
     Returns
     -------
     list
-        Give out the index of the selected starting cells.
+        The index number of selected starting cells.
     """
     if select_way == "coordinates":
-        # select = (
-        #     (adata.obsm["X_" + basis][:, 1] < boundary[0])
-        #     & (adata.obsm["X_" + basis][:, 1] > boundary[1])
-        #     & (adata.obsm["X_" + basis][:, 0] > boundary[2])
-        #     & (adata.obsm["X_" + basis][:, 0] < boundary[3])
-        # )
-        # start_cells = np.where(select)[0].tolist()
         if start_point is None:
-            raise ValueError(f"start_point must be specified in the 'coordinates' mode.")
-        
-        start_cells=nearest_neighbors(start_point,adata.obsm['X_spatial'],n_neigh)[0]
+            raise ValueError(
+                f"`start_point` must be specified in the 'coordinates' mode."
+            )
+
+        start_cells = nearest_neighbors(start_point, adata.obsm["X_" + basis], n_neigh)[0]
 
         if cell_type is not None:
-            type_cells=np.where(adata.obs['cluster']==cell_type)[0]
-            start_cells=sorted(set(start_cells).intersection(set(type_cells)))
+            type_cells = np.where(adata.obs["cluster"] == cell_type)[0]
+            start_cells = set(start_cells).intersection(set(type_cells))
 
     elif select_way == "cell_type":
-        if cell_type==None:
-            sys.exit("In 'cell_type' select way, `cell_type` cannot be None.")
+        if cell_type is None:
+            raise ValueError("in 'cell_type' mode, `cell_type` cannot be None.")
 
-        start_cells = np.where(adata.obs["cluster"] == cell_type)[0].tolist()
-        
-        if partition==True:
+        start_cells = np.where(adata.obs["cluster"] == cell_type)[0]
+
+        if split == True:
             mask = adata.obs["cluster"] == cell_type
-
             cell_coords = adata.obsm["X_" + basis][mask]
             cluster_centers = kmeans_centers(cell_coords, n_clusters=n_clusters)
 
@@ -246,11 +169,13 @@ def set_start_cells(
             start_cells = nearest_neighbors(
                 cluster_centers, select_cluster_coords, n_neigh
             ).flatten()
+    else:
+        raise ValueError(f"`select_way` must choose from 'coordinates' or 'cell_type'.")
 
-    return start_cells
+    return list(start_cells)
 
 
-def get_ptime(adata: AnnData, start_cells: np.ndarray):
+def get_ptime(adata: AnnData, start_cells: list):
     """
     Get the cell pseudotime based on transition probabilities from initial cells.
 
@@ -267,8 +192,8 @@ def get_ptime(adata: AnnData, start_cells: np.ndarray):
         Ptime correspongding to cells.
     """
     select_trans = adata.obsp["trans"][start_cells]
-    adata.obs["tran"] = np.sum(select_trans, axis=0)
-    cell_tran_sort = list(np.argsort(adata.obs["tran"]))
+    cell_tran = np.sum(select_trans, axis=0)
+    cell_tran_sort = list(np.argsort(cell_tran))
     cell_tran_sort = cell_tran_sort[::-1]
 
     ptime = pd.Series(dtype="float32", index=adata.obs.index)
@@ -278,7 +203,9 @@ def get_ptime(adata: AnnData, start_cells: np.ndarray):
     return ptime.values
 
 
-def get_neigh_trans(adata: AnnData, basis: str, n_neigh_pos: int =10, n_neigh_gene: int =0):
+def get_neigh_trans(
+    adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene: int = 0
+):
     """
     Get the transport neighbors from two ways, position and/or gene expression
 
@@ -325,7 +252,9 @@ def get_neigh_trans(adata: AnnData, basis: str, n_neigh_pos: int =10, n_neigh_ge
         if "X_pca" not in adata.obsm:
             print("X_pca is not in adata.obsm, automatically do PCA first.")
             sc.tl.pca(adata)
-        sc.pp.neighbors(adata, use_rep='X_pca', key_added='X_pca',n_neighbors=n_neigh_gene)
+        sc.pp.neighbors(
+            adata, use_rep="X_pca", key_added="X_pca", n_neighbors=n_neigh_gene
+        )
 
         neigh_gene = adata.obsp["distances"].indices.reshape(
             -1, adata.uns["neighbors"]["params"]["n_neighbors"] - 1
@@ -357,10 +286,12 @@ def get_neigh_trans(adata: AnnData, basis: str, n_neigh_pos: int =10, n_neigh_ge
     return trans_neigh_csr
 
 
-def get_velocity(adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene: int =0):
+def get_velocity(
+    adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene: int = 0
+)->tuple:
     """
     Get the velocity of each cell.
-    
+
     The speed can be determined in terms of the cell location and/or gene expression.
 
     Parameters
@@ -394,7 +325,7 @@ def get_velocity(adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene
         x1 = position[cell][0]  # 初始化细胞坐标
         y1 = position[cell][1]
         for neigh in adata.obsp["trans_neigh_csr"][cell].indices:  # 针对每个邻居
-            p = adata.obsp["trans_neigh_csr"][cell,neigh]
+            p = adata.obsp["trans_neigh_csr"][cell, neigh]
             if (
                 adata.obs["ptime"][neigh] < adata.obs["ptime"][cell]
             ):  # 若邻居的ptime小于当前的，则概率反向
@@ -411,11 +342,12 @@ def get_velocity(adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene
         V[cell][0] = cell_u / adata.obsp["trans_neigh_csr"][cell].indptr[1]
         V[cell][1] = cell_v / adata.obsp["trans_neigh_csr"][cell].indptr[1]
     adata.obsm["velocity_" + basis] = V
+    print(f"The velocity of cells store in 'velocity_{basis}'.")
 
-    E_grid, V_grid = vector_field_embedding_grid(
-        adata, E=position, V=adata.obsm["velocity_" + basis]
+    P_grid, V_grid = get_velocity_grid(
+        adata, P=position, V=adata.obsm["velocity_" + basis]
     )
-    return E_grid, V_grid
+    return P_grid, V_grid
 
 
 def get_2_biggest_clusters(adata):
@@ -446,7 +378,8 @@ def get_2_biggest_clusters(adata):
 
 
 def auto_get_start_cluster(adata, clusters: Optional[list] = None):
-    """Select the start cluster with the largest sum of transfer probability
+    """
+    Select the start cluster with the largest sum of transfer probability
 
     Parameters
     ----------
@@ -457,7 +390,8 @@ def auto_get_start_cluster(adata, clusters: Optional[list] = None):
 
     Returns
     -------
-        string: One cluster with maximum sum of transition probabilities
+    str    
+        One cluster with maximum sum of transition probabilities
     """
     if clusters == None:
         clusters = np.unique(adata.obs["cluster"])
@@ -485,28 +419,27 @@ def auto_get_start_cluster(adata, clusters: Optional[list] = None):
     return highest_cluster
 
 
-def vector_field_embedding_grid(
+def get_velocity_grid(
     adata,
-    E: np.ndarray,
+    P: np.ndarray,
     V: np.ndarray,
     smooth: float = 0.5,
     density: float = 1.0,
 ) -> tuple:
     """
-    Estimate the unitary displacement vectors within a grid.
-    This function borrows the ideas from scvelo: https://github.com/theislab/scvelo/blob/master/scvelo/plotting/velocity_embedding_grid.py.
+    Convert cell velocity to grid velocity for streamline display
+
+    The visualization of vector field borrows idea from scTour: https://github.com/LiQian-XC/sctour/blob/main/sctour.
+    
     Parameters
     ----------
-    E
-        The embedding.
+    P
+        The position of cells.
     V
-        The unitary displacement vectors under the embedding.
+        The velocity of cells.
     smooth
         The factor for scale in Gaussian pdf.
         (Default: 0.5)
-    stream
-        Whether to adjust for streamplot.
-        (Default: `False`)
     density
         grid density
         (Default: 1.0)
@@ -515,33 +448,31 @@ def vector_field_embedding_grid(
     tuple
         The embedding and unitary displacement vectors in grid level.
     """
-
-    grs = []
-    for i in range(E.shape[1]):
-        m, M = np.min(E[:, i]), np.max(E[:, i])  # 提取该维度上的最小值和最大值
-        diff = M - m
-        m = m - 0.01 * diff
-        M = M + 0.01 * diff
+    grids = []
+    for dim in range(P.shape[1]):
+        m, M = np.min(P[:, dim]), np.max(P[:, dim])
+        m = m - 0.01 * np.abs(M - m)
+        M = M + 0.01 * np.abs(M - m)
         gr = np.linspace(m, M, int(50 * density))
-        grs.append(gr)
+        grids.append(gr)
 
-    meshes = np.meshgrid(*grs)
-    E_grid = np.vstack([i.flat for i in meshes]).T
+    meshes = np.meshgrid(*grids)
+    P_grid = np.vstack([i.flat for i in meshes]).T
 
-    n_neigh = int(E.shape[0] / 50)
-    nn = NearestNeighbors(n_neighbors=n_neigh, n_jobs=-1)
-    nn.fit(E)
-    dists, neighs = nn.kneighbors(E_grid)
+    n_neighbors = int(P.shape[0] / 50)
+    nn = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=-1)
+    nn.fit(P)
+    dists, neighs = nn.kneighbors(P_grid)
 
-    scale = np.mean([g[1] - g[0] for g in grs]) * smooth
+    scale = np.mean([grid[1] - grid[0] for grid in grids]) * smooth
     weight = norm.pdf(x=dists, scale=scale)
-    weight_sum = weight.sum(1)
+    p_mass = weight.sum(1)
 
     V_grid = (V[neighs] * weight[:, :, None]).sum(1)
-    V_grid /= np.maximum(1, weight_sum)[:, None]
+    V_grid /= np.maximum(1, p_mass)[:, None]
 
-    E_grid = np.stack(grs)
-    ns = E_grid.shape[1]
+    P_grid = np.stack(grids)
+    ns = P_grid.shape[1]
     V_grid = V_grid.T.reshape(2, ns, ns)
 
     mass = np.sqrt((V_grid * V_grid).sum(0))
@@ -551,48 +482,72 @@ def vector_field_embedding_grid(
 
     V_grid[0][cutoff] = np.nan
 
-    adata.uns["E_grid"] = E_grid
+    adata.uns["P_grid"] = P_grid
     adata.uns["V_grid"] = V_grid
 
-    return E_grid, V_grid
+    return P_grid, V_grid
 
 
 class Lasso:
     """
     Lasso an region of interest (ROI) based on spatial cluster.
 
-    Examples:
-        L = st.tl.Lasso(adata)
-        L.vi_plot(group='group', group_color='group_color')
+    Parameters
+    ----------
+    adata
+        An :class:`~anndata.AnnData` object.
     """
 
     __sub_index = []
-    sub_cells=[]
+    sub_cells = []
 
     def __init__(self, adata):
         self.adata = adata
 
     def vi_plot(
         self,
-        basis="X_spatial",
-        cell_type:Optional[str]=None,
+        basis:str="spatial",
+        cell_type: Optional[str] = None,
     ):
-        cell_types = self.adata.obs['cluster'].unique()
+        """
+        Plot figures.
+
+        Parameters
+        ----------
+        basis
+            The basis in `adata.obsm` to store position information.
+            (Deafult: 'spatial')
+        cell_type
+            Restrict the cell type of starting cells.
+            (Deafult: None)
+
+        Returns
+        -------
+            The container of cell scatter plot and table.
+        """
+        cell_types = self.adata.obs["cluster"].unique()
         colors = sns.color_palette(n_colors=len(cell_types)).as_hex()
         cluster_color = dict(zip(cell_types, colors))
-        self.adata.uns['cluster_color'] = cluster_color
+        self.adata.uns["cluster_color"] = cluster_color
 
         df = pd.DataFrame()
         df["group_ID"] = self.adata.obs_names
-        df["labels"] = self.adata.obs['cluster'].values
-        df["spatial_0"] = self.adata.obsm[basis][:, 0]
-        df["spatial_1"] = self.adata.obsm[basis][:, 1]
-        df["color"] = df.labels.map(self.adata.uns['cluster_color'])
+        df["labels"] = self.adata.obs["cluster"].values
+        df["spatial_0"] = self.adata.obsm["X_" + basis][:, 0]
+        df["spatial_1"] = self.adata.obsm["X_" + basis][:, 1]
+        df["color"] = df.labels.map(self.adata.uns["cluster_color"])
 
         py.init_notebook_mode()
 
         f = go.FigureWidget(
-            [go.Scatter(x=df["spatial_0"], y=df["spatial_1"], mode="markers", marker_color=df["color"])]
+            [
+                go.Scatter(
+                    x=df["spatial_0"],
+                    y=df["spatial_1"],
+                    mode="markers",
+                    marker_color=df["color"],
+                )
+            ]
         )
         scatter = f.data[0]
         f.layout.plot_bgcolor = "rgb(255,255,255)"
@@ -617,7 +572,10 @@ class Lasso:
                         align=["left"] * 5,
                     ),
                     cells=dict(
-                        values=[df[col] for col in ["group_ID", "labels", "spatial_0", "spatial_1"]],
+                        values=[
+                            df[col]
+                            for col in ["group_ID", "labels", "spatial_0", "spatial_1"]
+                        ],
                         fill=dict(color="#F5F8FF"),
                         align=["left"] * 5,
                     ),
@@ -628,15 +586,18 @@ class Lasso:
         def selection_fn(trace, points, selector):
 
             t.data[0].cells.values = [
-                df.loc[points.point_inds][col] for col in ["group_ID", "labels", "spatial_0", "spatial_1"]
+                df.loc[points.point_inds][col]
+                for col in ["group_ID", "labels", "spatial_0", "spatial_1"]
             ]
 
             Lasso.__sub_index = t.data[0].cells.values[0]
-            Lasso.sub_cells=np.where(self.adata.obs.index.isin(Lasso.__sub_index))[0]
+            Lasso.sub_cells = np.where(self.adata.obs.index.isin(Lasso.__sub_index))[0]
 
             if cell_type is not None:
-                type_cells=np.where(self.adata.obs['cluster']==cell_type)[0]
-                Lasso.sub_cells=sorted(set(Lasso.sub_cells).intersection(set(type_cells)))
+                type_cells = np.where(self.adata.obs["cluster"] == cell_type)[0]
+                Lasso.sub_cells = sorted(
+                    set(Lasso.sub_cells).intersection(set(type_cells))
+                )
 
         scatter.on_selection(selection_fn)
 

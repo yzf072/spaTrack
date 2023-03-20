@@ -13,6 +13,8 @@ from scipy.signal import savgol_filter
 import statsmodels.formula.api as smf
 import scipy.stats
 import gc
+from anndata import AnnData
+from matplotlib.axes import Axes
 
 
 """
@@ -26,16 +28,16 @@ def js_score(gam_fit, grid_X):
     Parameters
     ----------
     gam_fit :
-            Fitted model by pyGAM
+        Fitted model by pyGAM
 
     grid_X: array
-            An array value grided by pyGAM's generate_X_grid function
+        An array value grided by pyGAM's generate_X_grid function
 
 
     Returns
     -------
     trend: str
-            Mark the fitted model is increase or decrease
+        Mark the fitted model is increase or decrease
 
     """
 
@@ -75,37 +77,42 @@ Cluster differential expression is used to as a reference to order gene.
 """
 
 
-def filter_gene(adata, min_exp_prop, hvg_gene=2000):
+def filter_gene(adata: AnnData, min_exp_prop: float, hvg_gene: int = 2000)->AnnData:
     """
+    Filter genes by minimum expression proporation and cluster differential expression.
+
     Parameters
     ----------
-    adata:
-          scanpy adata for infering trajectory
-
-    min_exp_prop: minimum expression proporation
-
-    abs_FC: log2 |FC| in differential expression
-
+    adata
+        An :class:`~anndata.AnnData` object.
+    min_exp_prop
+        Minimum expression proporation.
+    abs_FC
+        Log2 foldchange in differential expression.
+        
+    Returns
+    ----------
+    :class:`~anndata.AnnData`
+        The :class:`~anndata.AnnData` object formed by filtered genes.
     """
-
     ptime_list = list(adata.obs["ptime"])
     if sorted(ptime_list) == ptime_list:
         pass
     else:
-        raise Exception("error ： Please sort adata by ptime")
+        raise Exception("error: Please sort adata by ptime.")
 
-    cluster_order = adata.obs.groupby(["cluster"]).mean().sort_values(["ptime"]).index
-    print("cluter ordered by ptime : ", list(cluster_order))
+    cluster_order = adata.obs.groupby(["cluster"
+                                       ]).mean().sort_values(["ptime"]).index
+    print("clusters ordered by ptime: ", list(cluster_order))
     ptime_sort_matrix = adata.X.copy()
-    df_exp = pd.DataFrame(
-        data=ptime_sort_matrix, index=adata.obs.index, columns=adata.var.index
-    )
+    df_exp = pd.DataFrame(data=ptime_sort_matrix,
+                          index=adata.obs.index,
+                          columns=adata.var.index)
 
     # endog = adata.obs["ptime"]
     ##minimum expression proporation
-    min_prop_filter = df_exp[
-        df_exp.columns[(df_exp > 0).sum(axis=0) > int(len(adata) * min_exp_prop)]
-    ]
+    min_prop_filter = df_exp[df_exp.columns[(df_exp > 0).sum(
+        axis=0) > int(len(adata) * min_exp_prop)]]
 
     sc.pp.highly_variable_genes(adata, n_top_genes=hvg_gene)
 
@@ -125,22 +132,13 @@ def filter_gene(adata, min_exp_prop, hvg_gene=2000):
 
     # gene_list_lm=set(diff_gene_list).intersection(set(list(min_prop_filter.columns)))
     gene_list_lm = np.intersect1d(
-        min_prop_filter.columns, adata[:, adata.var.highly_variable].var_names
-    )
+        min_prop_filter.columns, adata[:, adata.var.highly_variable].var_names)
     adata_filter = adata[:, min_prop_filter.columns]
     adata_filter.uns["gene_list_lm"] = gene_list_lm
     # adata_filter.uns['diff_gene_list'] = diff_gene_list
     print("Cell number" + "\t" + str(len(adata_filter)))
     print("Gene number" + "\t" + str(len(gene_list_lm)))
     return adata_filter
-
-
-"""
-Function:
-
-Fit GAM model by formula gene_exp ~ Ptime
-
-"""
 
 
 def GAM_gene_fit(exp_gene_list):
@@ -194,41 +192,45 @@ Call ptime_gene_GAM() by  multi-process computing to improve operational speed
 """
 
 
-def ptime_gene_GAM(adata, core_number=3):
-
+def ptime_gene_GAM(adata: AnnData, core_number: int = 3) -> pd.DataFrame:
     """
+    Fit GAM model by formula gene_exp ~ Ptime.
+
+    Call GAM_gene_fit() by multi-process computing to improve operational speed.
+
     Parameters
     ----------
-    adata : Anndata
-            Scanpy adata for inferring trajectory.
-
-    core_number : int
-            Number of processes for caculating
+    adata
+        An :class:`~anndata.AnnData` object.
+    core_number
+        Number of processes for caculating.
 
     Returns
     -------
-    df_res: dataframe
-            pvalue: calculated from GAM
-            R2: a goodness-of-fit measure. larger value means better fit
-            pattern: increase or decrease. drection of gene expression changes across time
-            fdr: BH fdr
+    :class:`~pandas.DataFrame`
+        An :class:`~pandas.DataFrame` object, each column is one index.
 
+        - pvalue: calculated from GAM
+        - R2: a goodness-of-fit measure. larger value means better fit
+        - pattern: increase or decrease. drection of gene expression changes across time
+        - fdr: BH fdr
 
     """
-    ##perform GAM model on each gene
+    # perform GAM model on each gene
     gene_list_for_gam = adata.uns["gene_list_lm"]
 
-    df_exp_filter = pd.DataFrame(
-        data=adata.X, index=adata.obs.index, columns=adata.var.index
-    )
+    df_exp_filter = pd.DataFrame(data=adata.X,
+                                 index=adata.obs.index,
+                                 columns=adata.var.index)
 
     print("Genes number fitted by GAM model:  ", len(gene_list_for_gam))
     if core_number >= 1:
         para_list = list()
         for gene in gene_list_for_gam:
-            df_new = pd.DataFrame(
-                {"ptime": list(adata.obs["ptime"]), gene: list(df_exp_filter[gene])}
-            )
+            df_new = pd.DataFrame({
+                "ptime": list(adata.obs["ptime"]),
+                gene: list(df_exp_filter[gene])
+            })
             # df_new=df_new.loc[df_new[gene]>0]
             para_list.append((df_new, gene))
         p = mp.Pool(core_number)
@@ -255,28 +257,28 @@ Order genes according number id of the maximum expression window
 """
 
 
-def order_trajectory_genes(adata, df_sig_res, cell_number):
-
+def order_trajectory_genes(adata:AnnData, df_sig_res:pd.DataFrame, cell_number:int):
     """
+    Split cells sorted by ptime into widonws.
+
+    Order genes according number id of the maximum expression window.
+
     Parameters
     ----------
-    adata : AnnData object
-            filtered adat
-
-    df_sig_res: dataframe
-             return dataframe by ptime_gene_GAM() after filtering as significat gene dataframe
-
-    cell_number: int ,number
-              Cell number within splited window
+    adata
+        An :class:`~anndata.AnnData` object.
+    df_sig_res
+        Return dataframe by ptime_gene_GAM() after filtering as significat gene dataframe.
+    cell_number
+        Cell number within splited window.
 
     Returns
     -------
-    df_one_cell_exp_sort: dataframe
-            Columns:Sortted significant genes expression matrix according to mean expression value in windows
-            Index: cell_id
+    :class:`~pandas.DataFrame`
 
+        - columns:Sortted significant genes expression matrix according to mean expression value in windows
+        - index: cell_id
     """
-
     ptime_sort_exp_matrix = adata.X.copy()
 
     df_exp_filter = pd.DataFrame(
@@ -344,26 +346,24 @@ Plot ordered gene expression heatmap of the selected candidate trajectory genes
 
 
 def plot_trajectory_gene_heatmap(
-    sig_gene_exp_order,
-    smooth_length,
-    # TF=False,
-    cmap_name="twilight_shifted",
-    gene_label_size=30,
+    sig_gene_exp_order: pd.DataFrame,
+    smooth_length:int,
+    cmap_name: str ="twilight_shifted",
+    gene_label_size:int =30,
 ):
     """
     Parameters
     ----------
-    sig_gene_exp_order : dataframe
-            gene ordered expression dataframe.
-    smooth_length: int
-             length of smoothing window
-    cmap_name : color palette
+    sig_gene_exp_order
+        Gene ordered expression dataframe.
+    smooth_length
+        length of smoothing window
+    cmap_name
+        Color palette
 
     Returns
     -------
-
-    gg: fig
-        Heatmap: column represents cells, index is genes
+        A heatmap plot, column-representing cells, row-representing genes.
 
     """
     ## only show TF gene
@@ -417,24 +417,23 @@ Plot one trajectory gene
 """
 
 
-def plot_trajectory_gene(adata, gene_name, line_width=5, show_cell_type=False):
+def plot_trajectory_gene(adata:AnnData, gene_name:str, line_width:int=5, show_cell_type:bool=False)->Axes:
     """
     Parameters
     ----------
-    adata : AnnData object.
-
-    gene_name: str
-          gene used to plot
-    line_width : int
-          widthe of fitting line
-    show_cell_type : bool
-          whether to show cell type in plot
+    adata
+        An :class:`~anndata.AnnData` object.
+    gene_name
+        Gene used to plot.
+    line_width
+        Widthe of fitting line.
+    show_cell_type
+        Whether to show cell type in plot.
 
     Returns
     -------
-
-    axs: fig object
-        x axis indicate pseduotime; y axis indicate gene expression value
+    :class:`~matplotlib.axes.Axes`
+        An :class:`~matplotlib.axes.Axes` object. X axis indicates pseduotime and y axis indicates gene expression value.
 
     """
 
