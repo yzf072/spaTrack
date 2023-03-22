@@ -4,8 +4,9 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from typing import List, Tuple, Optional
 import ot
-from utils import gene_dist,spatial_dist,get_exp_matrix,pre_check_adata
 import pandas as pd
+
+from .utils import gene_dist,spatial_dist,get_exp_matrix,pre_check_adata
 
 
 def transfer_matrix(

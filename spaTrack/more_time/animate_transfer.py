@@ -7,7 +7,8 @@ import plotly.express as px
 import anndata as ad
 from typing import List, Optional
 from anndata import AnnData
-from utils import pre_check_adata
+
+from .utils import pre_check_adata
 
 def animate_transfer(
     adata_list:list,
