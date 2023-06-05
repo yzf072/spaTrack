@@ -7,7 +7,6 @@ import plotly.express as px
 import anndata as ad
 from typing import List, Optional
 from anndata import AnnData
-
 from .utils import pre_check_adata
 
 def animate_transfer(
@@ -117,7 +116,7 @@ def animate_transfer(
         fram = fram+[go.Frame(data=[go.Scatter(x=[xx[i][k]],
                                                y=[yy[i][k]],
                                                mode="markers",
-                                               marker=dict(color=[color_group_dict[df1['slice'+str(j+1)+'_annotation'][i]]], size=2),) for i in range(df1.shape[0])]) 
+                                               marker=dict(color=[color_group_dict[df1['slice'+str(j+1)+'_annotation'][i]]], size=1),) for i in range(df1.shape[0])]) 
                     for k in range(j*n, (j+1)*n)]
     # animate figure
     fig = go.Figure(
