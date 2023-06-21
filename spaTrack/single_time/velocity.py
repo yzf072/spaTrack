@@ -193,6 +193,7 @@ def get_ptime(adata: AnnData, start_cells: list):
     """
     select_trans = adata.obsp["trans"][start_cells]
     cell_tran = np.sum(select_trans, axis=0)
+    adata.obs['tran']=cell_tran
     cell_tran_sort = list(np.argsort(cell_tran))
     cell_tran_sort = cell_tran_sort[::-1]
 
@@ -287,7 +288,7 @@ def get_neigh_trans(
 
 
 def get_velocity(
-    adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene: int = 0
+    adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene: int = 0,grid_num=50,smooth=0.5,density=1.0
 )->tuple:
     """
     Get the velocity of each cell.
@@ -345,7 +346,7 @@ def get_velocity(
     print(f"The velocity of cells store in 'velocity_{basis}'.")
 
     P_grid, V_grid = get_velocity_grid(
-        adata, P=position, V=adata.obsm["velocity_" + basis]
+        adata, P=position, V=adata.obsm["velocity_" + basis],grid_num=grid_num,smooth=smooth,density=density
     )
     return P_grid, V_grid
 
@@ -423,6 +424,7 @@ def get_velocity_grid(
     adata,
     P: np.ndarray,
     V: np.ndarray,
+    grid_num: int = 50,
     smooth: float = 0.5,
     density: float = 1.0,
 ) -> tuple:
@@ -453,13 +455,13 @@ def get_velocity_grid(
         m, M = np.min(P[:, dim]), np.max(P[:, dim])
         m = m - 0.01 * np.abs(M - m)
         M = M + 0.01 * np.abs(M - m)
-        gr = np.linspace(m, M, int(50 * density))
+        gr = np.linspace(m, M, int(grid_num * density))
         grids.append(gr)
 
     meshes = np.meshgrid(*grids)
     P_grid = np.vstack([i.flat for i in meshes]).T
 
-    n_neighbors = int(P.shape[0] / 50)
+    n_neighbors = int(P.shape[0] / grid_num)
     nn = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=-1)
     nn.fit(P)
     dists, neighs = nn.kneighbors(P_grid)
