@@ -163,3 +163,122 @@ def pre_check_adata(
     adata.obs['y'] = adata.obsm[spatial_key][:,1]
     adata.obs['cell_id'] = adata.obs.index
     return adata
+
+## unbalanced ot and FGW.
+## ualanced ot
+## min  <gamma,c> + epsilon*H(gamma) 
+##      + rho*KL(gamma|mu) + rho*KL(gamma^T|nu)
+## s.t. gamma >= 0
+def uot(mu, nu, c, epsilon,
+         niter=50, tau=-0.5, verb = 1, rho = np.Inf, stopThr= 1E-7):
+
+    lmbda = rho / ( rho + epsilon )
+    if np.isinf(rho): lmbda = 1
+    ## format mu(m,1) nu(n,1)
+    mu = np.asarray(mu, float).reshape(-1,1)
+    nu = np.asarray(nu, float).reshape(-1,1)
+    N = [mu.shape[0], nu.shape[0]]
+    H1 = np.ones([N[0],1])
+    H2 = np.ones([N[1],1])
+    ## initialize
+    errs = []; Wprimal = []; Wdual = []
+    u = np.zeros([N[0],1], float)
+    v = np.zeros([N[1],1], float)
+    for i in range(niter):
+        u_prev = u
+        ## update u,v,pi
+        u = ave(tau, u, \
+            lmbda * epsilon * np.log(mu) \
+            - lmbda * epsilon * lse( M(u,v,H1,H2,c,epsilon) ) \
+            + lmbda * u )
+        v = ave(tau, v, \
+            lmbda * epsilon * np.log(nu) \
+            - lmbda * epsilon * lse( M(u,v,H1,H2,c,epsilon).T ) \
+            + lmbda * v )
+        pi = np.exp( M(u,v,H1,H2,c,epsilon) )
+        ## evaluate the primal dual functions and errors
+        if np.isinf(rho):
+            Wprimal.append(np.sum(c * pi) - epsilon*H(pi) )
+            Wdual.append(np.sum(u*mu) + np.sum(v*nu) - epsilon*np.sum(pi) )
+            err = np.linalg.norm( np.sum(pi,axis=1) - mu )
+            errs.append( err )
+        else:
+            Wprimal.append(np.sum(c*pi) - epsilon*H(pi) \
+                           + rho*KL(np.sum(pi,axis=1), mu) \
+                           + rho*KL(np.sum(pi,axis=0), nu) )
+            Wdual.append(- rho*KLd(u/rho,mu) - rho*KLd(v/rho,nu) \
+                         - epsilon*np.sum(pi) )
+            err = np.linalg.norm(u-u_prev,1)
+            errs.append( err )
+        ## check convergence condition
+        if err < stopThr and i > niter:
+            break
+
+    return pi
+
+
+## FGW algorithm
+# min  (1-alpha)*<pi,c> + alpha*<pi,c1,c2> 
+#      + epsilon*H(pi) 
+#      + rho*KL(pi|mu) + rho*KL(pi^T|nu)
+# s.t. pi >= 0
+def usot(mu, nu, c, c1, c2, alpha, epsilon = 0.1,
+         niter = 10, gw_loss = 'square', rho = np.Inf):
+    ## format mu(m,1) nu(n,1)
+    mu = np.asarray(mu, float).reshape(-1,1)
+    nu = np.asarray(nu, float).reshape(-1,1)
+    ## initialize pi,cost
+    pi0 = np.outer(mu, nu)
+    pi_old = np.array(pi0, float)
+    G = np.empty(c.shape, float)
+    for i in range(niter):
+        ## Construct loss
+        G_w = ( 1.0 - alpha ) * c
+        if gw_loss == 'square':
+            fc1 = 0.5*c1**2; fc2 = 0.5*c2**2
+            hc1 = c1; hc2 = c2
+        constC1 = np.dot(np.dot(fc1, mu), np.ones(len(nu), float).reshape(1,-1))
+        constC2 = np.dot(np.ones(len(mu)).reshape(-1,1), np.dot(nu.reshape(1,-1),fc2.T))
+        constC = constC1 + constC2
+        G_gw = alpha * 2.0 * (constC - np.dot(hc1, pi_old).dot(hc2.T))
+        G[:,:] = G_w[:,:] + G_gw[:,:]
+        ## ot or uot
+        if np.isinf(rho):
+            pi_tuta = ot.sinkhorn(mu.reshape(-1), nu.reshape(-1), G, epsilon)
+        else:
+            pi_tuta = uot(mu, nu, G, epsilon, rho = rho)
+        # Line search for update
+        CxC_tuta_minus_old = c1.dot(np.dot(pi_tuta-pi_old, c2))
+        CxC_old = c1.dot(np.dot(pi_old, c2))
+        a = -alpha*np.sum( CxC_tuta_minus_old * ( pi_tuta-pi_old ) )
+        b = np.sum( ( (1.0-alpha)*c+alpha*constC-2.0*alpha*CxC_old ) * ( pi_tuta-pi_old) )
+        if a > 0:
+            tau_update = min(1.0,max(0.0,-0.5*b/a))
+        elif a + b < 0:
+            tau_update = 1.0
+        else:
+            tau_update = 0.0
+        pi_new = (1.0-tau_update) * pi_old + tau_update * pi_tuta
+        pi_old = pi_new
+    return pi_new
+
+
+def ave(tau, u, u_prev):
+    return tau * u + ( 1 - tau ) * u_prev
+
+def lse(A):
+    return np.log(np.sum(np.exp(A),axis=1)).reshape(-1,1)
+
+def H(p):
+    return -np.sum( p * np.log(p+1E-20)-1 )
+
+def KL(h,p):
+    return np.sum( h * np.log( h/p ) - h + p )
+
+def KLd(u,p):
+    return np.sum( p * ( np.exp(-u) - 1 ) )
+
+def M(u,v,H1,H2,c,epsilon):
+    y = -c + np.matmul(u.reshape(-1,1), H2.reshape(1,-1)) + \
+        np.matmul(H1.reshape(-1,1), v.reshape(1,-1))
+    return y/epsilon

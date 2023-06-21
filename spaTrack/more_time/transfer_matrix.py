@@ -4,10 +4,8 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from typing import List, Tuple, Optional
 import ot
+from .utils import *
 import pandas as pd
-
-from .utils import gene_dist,spatial_dist,get_exp_matrix,pre_check_adata
-
 
 def transfer_matrix(
     adata1: AnnData, 
@@ -15,14 +13,10 @@ def transfer_matrix(
     layer: str = "X",
     spatial_key: str = "spatial",
     alpha: float = 0.1, 
-    spa_method: str = 'euclidean',
-    gene_method: str ='kl', 
-    distribution_1 = None,
-    distribution_2 = None, 
-    G_0 = None,
-    numItermax: int = 200, 
-    numItermaxEmd: int = 1000000,
-    verbose: bool = True,  
+    epsilon = 0.01,
+    rho = np.inf,
+    G_1 = None,
+    G_2 = None,
     **kwargs
 ):
     
@@ -37,14 +31,11 @@ def transfer_matrix(
         spatial_key: Key in .obsm containing coordinates for each cell.
         alpha:  Alignment tuning parameter. Note:0 <= alpha <= 1. When ``alpha = 0`` only the gene expression data is taken into account,
                while ``alpha =1`` only the spatial coordinates are taken into account.
-        spa_method: calculate spatial coordinate distances, defult is euclidean.
-        gene_method: calculate gene expression dissimilarity measure: ``'euclidean'`` or ``'cosine'``or``'wasserstein'``or``'kl'``.
-        distribution_1: The probability distribution of cells(in adata1),defult is None,means uniform distribution.
-        distribution_2: The probability distribution of cells(in adata2),defult is None,means uniform distribution.
-        G_0: The joint density distribution,defult is independent.
-        numItermax: Max number of iterations for cg during FGW-OT.
-        numItermaxEmd: Max number of iterations for emd during FGW-OT.
-        verbose: If ``True``, FGW-OT is verbose.
+        epsilon: weight for entropy regularization term,defaults to 1.0.
+        rho: weight for KL divergence penalizing unbalanced transport,defaults to 100.0.
+        G_1: distance matrix within spatial data 1 (spots, spots),defult is None.
+        G_2: distance matrix within spatial data 2(spots, spots),defult is None.
+        
    
     Returns:
         matrix(dim:n_obs*m_obs) of transition probability.
@@ -59,44 +50,35 @@ def transfer_matrix(
     exp_martix_2 = get_exp_matrix(adata2)
     
     ## Calculate spatial coordinates diatances
-    spa_dist_1 = spatial_dist(adata1,spa_method='euclidean')
-    spa_dist_2 = spatial_dist(adata2,spa_method='euclidean')
+    spa_dist_1 = spatial_dist(adata1)
+    spa_dist_2 = spatial_dist(adata2)
     
     ## Calculate gene expression dissimilarity
-    M = gene_dist(exp_martix_1,exp_martix_2,gene_method='kl')
+    M = gene_dist(exp_martix_1,exp_martix_2)
     
     ## init distributions
-    p_1 = np.ones((adata1.shape[0],)) / adata1.shape[0] if distribution_1 is None else np.asarray(distribution_1)
-    p_2 = np.ones((adata2.shape[0],)) / adata2.shape[0] if distribution_2 is None else np.asarray(distribution_2)
+    weight_matrix = np.exp(1-M)
+    p_1 = np.sum(weight_matrix, axis=1)
+    p_2 = np.sum(weight_matrix, axis=0)
+    p_1 = p_1/np.sum(p_1)
+    p_2 = p_2/np.sum(p_2)
     
-    ## Run FGW-OT
-    constC, hC1, hC2 = ot.gromov.init_matrix(spa_dist_1, spa_dist_2, p_1, p_2, loss_fun="square_loss")
-    ## defult independent joint density.
-    if G_0 is None:
-        G0 = p_1[:,None] * p_2[None, :]
-    ## gwloss+gwgrad
-    def f(G):
-        return ot.gromov.gwloss(constC, hC1, hC2, G)
-    def df(G):
-        return ot.gromov.gwggrad(constC, hC1, hC2, G)
-    
-    pi,log = ot.gromov.cg(
-        p_1,
-        p_2,
-        (1 - alpha) * M, ## loss matrix
-        alpha, ## Regularization term>0
-        f,
-        df,
-        G0,
-        armijo=False,
-        C1=spa_dist_1,
-        C2=spa_dist_2,
-        constC=constC,
-        numItermax=numItermax,
-        numItermaxEmd=numItermaxEmd,
-        log=True,)
-    
-    pi = np.array(pi)
+    ## Run unbalanced ot
+    if alpha > 0.0:
+        if G_1 is None:
+            G_1 = spa_dist_1/np.max(spa_dist_1)
+        if G_2 is None:
+            G_2 = spa_dist_2/np.max(spa_dist_2)
+    ## 01. None Graph structure
+    # balanced ot, rho=inf
+    if alpha == 0.0 and np.isinf(rho):
+        pi = ot.sinkhorn(p_1, p_2, M, epsilon)
+    # unbalanced ot,rho<inf
+    elif alpha == 0.0 and not np.isinf(rho):
+        pi = uot(p_1, p_2, M, epsilon, rho = rho)
+    ## 02. Graph structure considered
+    else:
+        pi = usot(p_1, p_2, M, G_1, G_2, alpha, epsilon = epsilon, rho = rho)
     
     return pi
 
@@ -141,6 +123,8 @@ def generate_animate_input(
         if i >=1 and i <= len(adata_list)-1:
             map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1)).drop(
                         ['pi_value'+str(i),'pi_value'+str(i+1)], axis=1)
+    if len(pi_list) == 1:
+        map_list[-1] =map_list[0].drop(['pi_value'+str(i+1)], axis=1)
     pi_matrix = map_list[-1]
     
     ## 3.merge adata.obs for two or more time.
