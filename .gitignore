@@ -1,3 +1,10 @@
+# data
+liver_transport
+mouse_brain
+
+# test
+test_2time.ipynb
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
