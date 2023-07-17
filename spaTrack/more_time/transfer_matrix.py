@@ -115,14 +115,15 @@ def generate_animate_input(
     ## 2.merge transfer matrix data for two or more time, return pi_matrix, such as slice1,slice2,slice3,......
     map_list=[]
     for i in range(0,len(adata_list)-1):
-        map_data,pi=__pi_process(pi_list[i],adata_list[i],adata_list[i+1])
+        map_data,pi=pi_process(pi_list[i],adata_list[i],adata_list[i+1])
         map_data['slice'+str(i+1)] =pi.index
         map_data['slice'+str(i+2)]=pi.idxmax(axis=1)
         map_data['pi_value'+str(i+1)]=pi.max(axis=1)
         map_list.append(map_data)
         if i >=1 and i <= len(adata_list)-1:
-            map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1)).drop(
-                        ['pi_value'+str(i),'pi_value'+str(i+1)], axis=1)
+            # map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1)).drop(
+            #             ['pi_value'+str(i),'pi_value'+str(i+1)], axis=1)
+            map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1))
     if len(pi_list) == 1:
         map_list[-1] =map_list[0].drop(['pi_value'+str(i+1)], axis=1)
     pi_matrix = map_list[-1]
@@ -158,7 +159,7 @@ def generate_animate_input(
     ## return pandas as animate_transfer input.
     return pi_matrix_coord
 
-def __pi_process(
+def pi_process(
     pi,
     adata1,
     adata2,
@@ -171,3 +172,10 @@ def __pi_process(
     pi.columns = adata2.obs.index
     map_data = pd.DataFrame(index=pi.index)
     return map_data,pi
+
+def map_data(pi,adata1,adata2):
+    map_data,pi=pi_process(pi,adata1,adata2)
+    map_data['slice_1'] =pi.index
+    map_data['slice_2']=pi.idxmax(axis=1)
+    map_data['pi_value']=pi.max(axis=1)
+    return map_data
