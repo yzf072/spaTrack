@@ -12,6 +12,7 @@ import sys
 from scipy.sparse import issparse
 import networkx as nx 
 import matplotlib.pyplot as plt 
+from tqdm import tqdm
 
 from typing import Literal, Union, List
 
@@ -149,19 +150,23 @@ class Trainer():
     ) -> None:
         self.mapping_num=mapping_num
         self.all_gtf = []
-        for i in range(training_times): 
-            self.model=Model(len(self.genes),len(self.tfs)).to(self.device)
-            loss_fn=nn.MSELoss()
-            optimizer=torch.optim.SGD(self.model.parameters(),lr=0.1)
+        
+        with tqdm(total=training_times*iter_times) as pbar:
+            for i in range(training_times): 
+                pbar.set_description(f"Train {i + 1}")
+                self.model=Model(len(self.genes),len(self.tfs)).to(self.device)
+                loss_fn=nn.MSELoss()
+                optimizer=torch.optim.SGD(self.model.parameters(),lr=0.1)
 
-            epochs = iter_times
-            for t in range(epochs): 
-                print(f"Epoch {t+1}\n-------------------------------")
-                self.train(self.train_dl, self.model, loss_fn, optimizer)
-                self.test(self.test_dl, self.model, loss_fn)
-            print("Done!")
-            gtf=self.model.linear.weight.T
-            self.all_gtf.append(gtf)
+                epochs = iter_times
+                for t in range(epochs): 
+                    train_loss=self.train(self.train_dl, self.model, loss_fn, optimizer)
+                    test_loss=self.test(self.test_dl, self.model, loss_fn)
+                    
+                    pbar.set_postfix({'train_loss': train_loss, 'test_loss': test_loss}, refresh=True)
+                    pbar.update()
+                gtf=self.model.linear.weight.T
+                self.all_gtf.append(gtf)
 
         # set the highest weighted map (TF itself) to 0
         sum_all_gtf=torch.sum(torch.stack(self.all_gtf),dim=0)
@@ -195,7 +200,7 @@ class Trainer():
         columns=['TF','gene','weight']
         self.network_df=pd.DataFrame(data=network_rows,columns=columns)
         self.network_df.to_csv(filename,index=0)
-        print(f'weight relationships of tfs and genes are stored in {filename}')
+        print(f'Weight relationships of tfs and genes are stored in {filename}.')
 
 
     def plot_scatter(self,type='raise',num_rows=2,num_cols=5,fig_width=20,fig_height=8,):
@@ -383,7 +388,7 @@ class Trainer():
         ptime_1_index=ptime[ptime==1].index
 
         middle_idx=list(self.adata.obs.index[len(ptime_0_index):len(self.adata)-len(ptime_1_index)])
-        sub_length=40
+        sub_length=80
         sub_index=[middle_idx[i:i+sub_length] for i in range(0, len(middle_idx), sub_length)][:-1]
 
         # sub_index.insert(0,list(ptime_0_index)) # insert head indexes
@@ -405,10 +410,11 @@ class Trainer():
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+            # if batch % 25 ==0:
+            #     loss,current=loss.item(), (batch+1)*len(X)
+            #     print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             
-            if batch % 25 ==0:
-                loss,current=loss.item(), (batch+1)*len(X)
-                print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+        return loss.item()
 
 
     def test(self,dataloader, model, loss_fn):
@@ -422,4 +428,6 @@ class Trainer():
                 pred=model(X)
                 test_loss+=loss_fn(pred,y).item()
         test_loss/=num_batches
+
+        return test_loss
         print(f"Avg loss: {test_loss:>8f} \n")
