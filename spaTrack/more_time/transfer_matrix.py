@@ -121,9 +121,8 @@ def generate_animate_input(
         map_data['pi_value'+str(i+1)]=pi.max(axis=1)
         map_list.append(map_data)
         if i >=1 and i <= len(adata_list)-1:
-            # map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1)).drop(
-            #             ['pi_value'+str(i),'pi_value'+str(i+1)], axis=1)
-            map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1))
+             map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1)).drop(
+                         ['pi_value'+str(i),'pi_value'+str(i+1)], axis=1)
     if len(pi_list) == 1:
         map_list[-1] =map_list[0].drop(['pi_value'+str(i+1)], axis=1)
     pi_matrix = map_list[-1]
