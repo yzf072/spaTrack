@@ -111,7 +111,6 @@ def generate_animate_input(
         else:
             adata_list[i]= pre_check_adata(adata,spatial_key=spatial_key,time=time,annotation=annotation)
 
-    
     ## 2.merge transfer matrix data for two or more time, return pi_matrix, such as slice1,slice2,slice3,......
     map_list=[]
     for i in range(0,len(adata_list)-1):
@@ -121,11 +120,15 @@ def generate_animate_input(
         map_data['pi_value'+str(i+1)]=pi.max(axis=1)
         map_list.append(map_data)
         if i >=1 and i <= len(adata_list)-1:
-             map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1)).drop(
-                         ['pi_value'+str(i),'pi_value'+str(i+1)], axis=1)
+             # map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1)).drop(
+             #             ['pi_value'+str(i),'pi_value'+str(i+1)], axis=1)
+            map_list[i]=pd.merge(map_list[i-1], map_list[i], left_on='slice'+str(i+1), right_on='slice'+str(i+1))                  
     if len(pi_list) == 1:
-        map_list[-1] =map_list[0].drop(['pi_value'+str(i+1)], axis=1)
+        #map_list[-1] =map_list[0].drop(['pi_value'+str(i+1)], axis=1)
+        map_list[-1] =map_list[0]
     pi_matrix = map_list[-1]
+    pi_matrix_picol = pi_matrix.copy()
+    pi_matrix.drop(columns=pi_matrix.columns[pi_matrix.columns.str.startswith('pi')], inplace=True)
     
     ## 3.merge adata.obs for two or more time.
     data_info = pd.concat(([i.obs for i in adata_list]),axis = 0)
@@ -142,7 +145,6 @@ def generate_animate_input(
     y_list = [i for i in pi_matrix_columns if i.startswith("y")]
     lable_list = slice_list + annotation_list + x_list + y_list
     pi_matrix_coord = pi_matrix[lable_list]
-    
     ## 4.2 rename sub solumns.
     annotation_dic = {ele:"slice"+str(i+1)+"_annotation" for i,ele in enumerate(annotation_list)}
     x_dic = {ele:"slice"+str(i+1)+"_x" for i,ele in enumerate(x_list)}
@@ -155,6 +157,10 @@ def generate_animate_input(
             pi_matrix_coord['k_line_'+str(i)+str(i+1)]=(pi_matrix_coord["slice"+str(i)+"_y"] -pi_matrix_coord["slice"+str(i+1)+"_y"]) / (pi_matrix_coord["slice"+str(i)+"_x"] - pi_matrix_coord["slice"+str(i+1)+"_x"])
             pi_matrix_coord['b_line_'+str(i)+str(i+1)] = pi_matrix_coord["slice"+str(i)+"_y"] -pi_matrix_coord['k_line_'+str(i)+str(i+1)]*pi_matrix_coord["slice"+str(i)+"_x"]
     
+    ## add 
+    for col in pi_matrix_picol.columns:  
+        if col.startswith('pi'):  
+            pi_matrix_coord[col] = pi_matrix_picol[col]
     ## return pandas as animate_transfer input.
     return pi_matrix_coord
 
