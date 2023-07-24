@@ -120,7 +120,7 @@ class Trainer():
             self.tfs=self.genes.intersection(all_tfs.gene.tolist())
 
             self.generate_data_p_time(cell_divide_per_time, cell_select_per_time, cell_generate_per_time)
-        elif type=='2_time':
+        elif data_type=='2_time':
             # 2_time Pattern need two adata files, the cell mapping file and the tfs file.
             if type(expression_matrix_path)!=list or len(expression_matrix_path)!=2:
                 sys.exit('In 2_time mode, a list of gene expression matrix paths for two slices must be provided.')
@@ -136,6 +136,20 @@ class Trainer():
 
             sc.pp.filter_genes(self.adata1, min_cells=min_cells[0],inplace=True)
             sc.pp.filter_genes(self.adata2, min_cells=min_cells[1],inplace=True)
+
+            # only use the mapping cells
+            self.adata1=self.adata1[self.cell_mapping.index_x]
+            self.adata2=self.adata2[self.cell_mapping.index_y]
+            
+            # get same genes
+            same_genes = list(self.adata1.var_names & self.adata2.var_names)
+            self.adata1 = self.adata1[:,same_genes]
+            self.adata2 = self.adata2[:,same_genes]
+            self.genes = self.adata1.var_names
+
+            # get tfs
+            all_tfs=pd.read_csv(self.tfs_path,index_col=0)
+            self.tfs=self.genes.intersection(all_tfs.gene.tolist())
 
             self.generate_data_2_time(cell_generate_per_time,cell_select_per_time)
 
@@ -244,6 +258,7 @@ class Trainer():
 
         columns=['TF','gene','weight']
         self.network_df=pd.DataFrame(data=network_rows,columns=columns)
+        self.network_df.sort_values(by='weight', ascending=False, inplace=True)
         self.network_df.to_csv(filename,index=0)
         print(f'Weight relationships of tfs and genes are stored in {filename}.')
 
@@ -275,16 +290,20 @@ class Trainer():
         fig, axs = plt.subplots(num_rows, num_cols,figsize=(fig_width,fig_height),)
         for i, ax in enumerate(axs.flatten()):
             if type=='raise':
-                gene=self.max_TF_idx[i][0]
-                TF=self.max_TF_idx[i][1]
+                gene_name=self.network_df.iloc[i]['gene']
+                TF_name=self.network_df.iloc[i]['TF']
+                gene_loc=self.genes.get_loc(gene_name)
+                TF_loc=self.tfs.get_loc(TF_name)
             elif type=='drop':
-                gene=self.min_TF_idx[i][0]
-                TF=self.min_TF_idx[i][1]
-            x=self.output_data[:,TF]
-            y=self.input_data[:,gene]
+                gene_name=self.network_df.iloc[-(i+1)]['gene']
+                TF_name=self.network_df.iloc[-(i+1)]['TF']
+                gene_loc=self.genes.get_loc(gene_name)
+                TF_loc=self.tfs.get_loc(TF_name)
+            x=self.output_data[:,TF_loc]
+            y=self.input_data[:,gene_loc]
             
             ax.scatter(x, y, s=1, color='#377eb8')
-            ax.set_title(f"{self.tfs[TF.item()]}, {self.genes[gene.item()]}")
+            ax.set_title(f"{TF_name}, {gene_name}")
             # ax.set_aspect('equal')
         # plt.tight_layout()
         # fig.subplots_adjust(left=0.06)
@@ -302,23 +321,9 @@ class Trainer():
         cell_select_per_time
             The amount of data randomly selected at each time point.
         """        
-        # only use the mapping cells
-        self.adata1=self.adata1[self.cell_mapping.index_x]
-        self.adata2=self.adata2[self.cell_mapping.index_y]
-        
-        # get same genes
-        same_genes = list(self.adata1.var_names & self.adata2.var_names)
-        self.adata1 = self.adata1[:,same_genes]
-        self.adata2 = self.adata2[:,same_genes]
-        self.genes = self.adata1.var_names
-
         delta_gene = self.adata2.X-self.adata1.X
         if issparse(delta_gene):
             delta_gene=delta_gene.A
-
-        # get tfs
-        all_tfs=pd.read_csv(self.tfs_path,index_col=0)
-        self.tfs=self.genes.str.lower().intersection(all_tfs.gene.str.lower().tolist())
 
         self.get_one_hot()
 
