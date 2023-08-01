@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader,TensorDataset
@@ -101,8 +100,21 @@ class Trainer():
         cell_generate_per_time: int = 500,
         train_ratio: float = 0.8,
         use_gpu: bool = True,
+        random_state: int = 0,
     ) -> None:
         self.train_ratio=train_ratio
+
+        gpu=torch.cuda.is_available() and use_gpu
+        if gpu:
+            torch.cuda.manual_seed(random_state)
+            self.device=torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
+        
+        np.random.seed(random_state)
+        random.seed(random_state)
+        torch.manual_seed(random_state)
+
         # read gene expression, cell ptime and tfs files. 
         if data_type=='p_time':
             if type(expression_matrix_path) == list:
@@ -152,12 +164,6 @@ class Trainer():
             self.tfs=self.genes.intersection(all_tfs.gene.tolist())
 
             self.generate_data_2_time(cell_generate_per_time,cell_select_per_time)
-
-        gpu=torch.cuda.is_available() and use_gpu
-        if gpu:
-            self.device=torch.device('cuda')
-        else:
-            self.device = torch.device('cpu')
 
 
     def getMetaData(self,cell_generate_per_time,cell_select_per_time) -> None:
@@ -217,8 +223,7 @@ class Trainer():
                 loss_fn=nn.MSELoss()
                 optimizer=torch.optim.SGD(self.model.parameters(),lr=0.1)
 
-                epochs = iter_times
-                for t in range(epochs): 
+                for t in range(iter_times): 
                     train_loss=self.train(self.train_dl, self.model, loss_fn, optimizer)
                     test_loss=self.test(self.test_dl, self.model, loss_fn)
                     
@@ -415,7 +420,7 @@ class Trainer():
         self.test_dl=DataLoader(test_set,batch_size=batch_size)
 
 
-    def plot_gene_regulation(self,min_weight,min_node_num,cmap='coolwarm'):
+    def plot_gene_regulation(self,min_weight,min_node_num,cmap='coolwarm') -> None:
         """
         Draw the gene regulation network graph.
 
@@ -453,15 +458,18 @@ class Trainer():
         betCent = nx.betweenness_centrality(G, normalized=True, endpoints=True)
         node_color = [2000.0 * G.degree(v) for v in G]
         #node_color = [community_index[n] for n in H]
-        node_size =  [v * 3000 for v in betCent.values()]
+        node_size =  5
 
         label_name_new = dict(zip(label_name.values(), label_name.values()))
 
 
-        fig = plt.figure(figsize = (8,8), dpi=200)
-        nx.draw_networkx(G,pos,alpha = 0.8, node_color = node_color,
-            node_size = node_size ,font_size = 20, width = 0.4, cmap = cmap,
-                        with_labels=True, labels=label_name_new,edge_color ='grey')
+        fig = plt.figure(figsize = (6,6), dpi=200)
+        # nx.draw_networkx(G,pos,alpha = 0.8, node_color = node_color,
+        #     node_size = node_size ,font_size = 20, width = 0.4, cmap = cmap,
+        #                 with_labels=True, labels=label_name_new,edge_color ='grey')
+        nx.draw_networkx_nodes(G, pos, node_color=node_color, node_size = node_size,cmap = cmap,alpha=0.8)
+        nx.draw_networkx_edges(G,pos,alpha=0.1,width=1)
+        nx.draw_networkx_labels(G,pos,font_size = 8,font_color='orange',labels=label_name_new,bbox={'boxstyle':'round','facecolor':'white','edgecolor':'orange'})
 
     def get_one_hot(self,) -> None:
         """

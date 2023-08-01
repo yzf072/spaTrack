@@ -27,5 +27,5 @@ setuptools.setup(
         'scipy==1.9.1',
         'torch>=2.0.1',
     ],
-    python_requires='>=3.9'
+    python_requires='>=3.7'
 )
