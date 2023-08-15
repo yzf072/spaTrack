@@ -5,7 +5,7 @@ Trajectory inference (TI) provides important insights in understanding cell deve
 
 spaTrack has the potential to capture fine local details of trajectory within a single tissue section of spatial transcriptomics (ST) data, as well as reconstruct cell dynamics across multiple tissue sections in a time series. To capture potential dynamic drivers, spaTrack models the fate of a cell as a function of expression profile along the time points driven by transcription factors, which facilitates the identification of key molecular regulators that govern cellular trajectories.
 
-<div style="display: flex;">   <div style="flex-basis: 50%; padding-right: 10px;">     <img src="https://github.com/yzf072/spaTrack_tutorials/raw/main/docs/source/_static/TI.png" alt="Image 1" style="width: 100%;">     <p style="text-align: center;">Infer cell trajectory</p>   </div>   <div style="flex-basis: 50%; padding-left: 10px;">     <img src="https://github.com/yzf072/spaTrack_tutorials/raw/main/docs/source/_static/transfer.png" alt="Image 2" style="width: 100%;">     <p style="text-align: center;">Visualize cell transfer</p>   </div> </div>
+<img src="https://github.com/yzf072/spaTrack_tutorials/raw/main/docs/source/_static/stitch.png" width="1000px">
 
 # Highlighted features
 
