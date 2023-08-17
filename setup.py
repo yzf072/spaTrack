@@ -23,9 +23,9 @@ setuptools.setup(
         'ipywidgets>=8.0.7',
         'pygam>=0.8.0',
         'networkx==2.5',
-        'numpy==1.22.4',
+        'numpy>=1.22.4',
         'scipy==1.9.1',
         'torch>=2.0.1',
     ],
-    python_requires='>=3.7'
+    python_requires='>=3.8'
 )
