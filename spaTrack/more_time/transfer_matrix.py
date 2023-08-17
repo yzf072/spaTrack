@@ -99,7 +99,7 @@ def generate_animate_input(
         spatial_key: Key in .obsm containing coordinates for each cell.
         time: time Key in .obs.
         annotation: cell type Key in .obs.
-    Returns；
+    Returns:
         DataFrame of transfer info between all times, as input of dispaly animate plot.
 
     """

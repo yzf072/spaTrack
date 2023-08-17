@@ -38,7 +38,7 @@ def visual_3D_mapping_3(df_concat,df_mapping,
     for slice_id in df_mapping.columns:   
 
         df1=pd.DataFrame(df_mapping[slice_id])
-        df1.columns=['CellID']
+        df1.columns=['cell_id']
         df_merge=pd.merge(df1,df_concat.loc[df_concat['batch']==slice_id])
         df_mapping[[slice_id+'_cluster',slice_id+'_x',slice_id+'_y']]=df_merge[['annotation','x','y']]
 
@@ -56,7 +56,7 @@ def visual_3D_mapping_3(df_concat,df_mapping,
         distance=distance+0.5
         distance_list.append(distance)
         for i in range(len(df_adata)):
-            if df_adata['CellID'].iloc[i] in list(df_mapping[batch]):
+            if df_adata['cell_id'].iloc[i] in list(df_mapping[batch]):
                 pass
             else:
                 ax.scatter(distance,df_adata['x'].iloc[i], df_adata['y'].iloc[i], edgecolors=color_cell[df_adata['annotation'].iloc[i]],s=point_size,facecolors='none',linewidth=point_size/3)

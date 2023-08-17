@@ -15,6 +15,10 @@ import scanpy as sc
 from .vectorfield import *
 from .utils import nearest_neighbors
 
+# We caculated and visualized the LAP path along the trajectory using the corresponding functions implemented in the Dynamo.
+# Ref: Qiu X, Zhang Y, Martin-Rufino JD, Weng C, Hosseinzadeh S, Yang D, et al. Mapping transcriptomic vector fields of single cells. Cell. 2022 Feb 17;185(4):690-711.e45. doi: 10.1016/j.cell.2021.12.045. 
+# dynamo: https://github.com/aristoteleo/dynamo-release.
+
 def distance_point_to_segment(point, segment_start, segment_end):
     segment_vector = segment_end - segment_start
     point_vector = point - segment_start

@@ -24,12 +24,12 @@ def glm_window(adata, cell_numer=20, top_rela_gene_number=30):
     Returns
     -------
         Heatmap
-    """    
-    # 1.排序
+    """
+    # 1. sort
     adata = adata[np.argsort(adata.obs["ptime"].values), :].copy()
     ptime_sort_matrix = adata.X.copy()
 
-    # 2.准备glm输入
+    # 2. prepare the glm input
     exog = pd.DataFrame(
         data=ptime_sort_matrix, index=adata.obs.index, columns=adata.var.index
     )
@@ -38,36 +38,36 @@ def glm_window(adata, cell_numer=20, top_rela_gene_number=30):
     gamma_results = gamma_model.fit()
     pvalues = gamma_results.pvalues
 
-    # 3.提取相关性最大的基因
+    # 3. extract the most correlated genes
     rela_genes = pvalues[np.argsort(pvalues.values)].index[:top_rela_gene_number]
     max_cell = pd.DataFrame(index=rela_genes, columns=["max"])
     rela_exog = exog.loc[:, rela_genes]
     rela_exog_matrix = np.array(rela_exog)
 
-    # 4.计算每个窗口的细胞数（向上取整），窗口数量
+    # 4. calculate the cell number of each window (rounded up), the number of windows
     cell_number = cell_numer
     window_number = math.ceil(adata.n_obs / cell_number)
 
-    # 5.重置形状
+    # 5. reshape
     rela_exog_matrix.resize(
         (cell_number * window_number, len(rela_genes)), refcheck=False
     )
 
-    # 6.分块
+    # 6. divide into blocks
     block_matrix = rela_exog_matrix.reshape(
         (window_number, cell_number, len(rela_genes))
     )
 
-    # 7.每个block列相加
+    # 7. add each block column
     window_matrix = np.sum(block_matrix, axis=1)
 
-    # 8.计算每个窗口的细胞数量
+    # 8. calculate the cell number of each window
     cell_in_window = np.array(
         [[cell_number]] * (window_number - 1)
         + [[adata.n_obs - cell_number * (window_number - 1)]]
     )
 
-    # 9.取得窗口平均值
+    # 9. get window average
     mean_window_matrix = window_matrix / cell_in_window
     window_exog = pd.DataFrame(
         data=mean_window_matrix,
@@ -75,7 +75,7 @@ def glm_window(adata, cell_numer=20, top_rela_gene_number=30):
         columns=rela_genes,
     )
 
-    # 10.对相关基因进行排序
+    # 10. rank related genes
     for i in rela_genes:
         max_cell.loc[i, "max"] = window_exog[i].idxmax()
 
@@ -91,16 +91,16 @@ def glm_window(adata, cell_numer=20, top_rela_gene_number=30):
     max_cell = max_cell.iloc[np.argsort(max_cell["ptime"].values), :]
     sort_window_exog = window_exog.loc[:, max_cell.index]
 
-    # 11.z-score
+    # 11. z-score
     zscore_matrix = stats.zscore(sort_window_exog, axis=0)
 
-    # 12.标准化
+    # 12. normalization
     norm_matrix = preprocessing.normalize(zscore_matrix, axis=0, norm="max")
     last_pd = pd.DataFrame(
         data=norm_matrix, index=sort_window_exog.index, columns=sort_window_exog.columns
     )
 
-    # 13.heatmap
+    # 13. heatmap
     plt.figure(figsize=(15, 3))
     gg = sns.heatmap(last_pd, cmap="plasma")
 
@@ -120,7 +120,7 @@ def one_gene(adata, gene_name):
     Returns
     -------
         Scatter plot
-    """    
+    """
     ptime = adata.obs["ptime"]
     gene = adata[:, gene_name].X.T[0]
 

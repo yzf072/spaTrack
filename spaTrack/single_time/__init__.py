@@ -20,15 +20,12 @@ from .Pgene import (
     ptime_gene_GAM,
     order_trajectory_genes,
     plot_trajectory_gene_heatmap,
-    plot_trajectory_gene
+    plot_trajectory_gene,
 )
 
 from .utils import nearest_neighbors
 
-
 from .gene_regulation import (
-    Trainer,
-    
-)
+    Trainer, )
 
-__version__ = '0.0.2'
+__version__ = '0.0.1'

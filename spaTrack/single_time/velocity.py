@@ -147,7 +147,9 @@ def set_start_cells(
                 f"`start_point` must be specified in the 'coordinates' mode."
             )
 
-        start_cells = nearest_neighbors(start_point, adata.obsm["X_" + basis], n_neigh)[0]
+        start_cells = nearest_neighbors(start_point, adata.obsm["X_" + basis], n_neigh)[
+            0
+        ]
 
         if cell_type is not None:
             type_cells = np.where(adata.obs["cluster"] == cell_type)[0]
@@ -193,7 +195,7 @@ def get_ptime(adata: AnnData, start_cells: list):
     """
     select_trans = adata.obsp["trans"][start_cells]
     cell_tran = np.sum(select_trans, axis=0)
-    adata.obs['tran']=cell_tran
+    adata.obs["tran"] = cell_tran
     cell_tran_sort = list(np.argsort(cell_tran))
     cell_tran_sort = cell_tran_sort[::-1]
 
@@ -288,8 +290,14 @@ def get_neigh_trans(
 
 
 def get_velocity(
-    adata: AnnData, basis: str, n_neigh_pos: int = 10, n_neigh_gene: int = 0,grid_num=50,smooth=0.5,density=1.0
-)->tuple:
+    adata: AnnData,
+    basis: str,
+    n_neigh_pos: int = 10,
+    n_neigh_gene: int = 0,
+    grid_num=50,
+    smooth=0.5,
+    density=1.0,
+) -> tuple:
     """
     Get the velocity of each cell.
 
@@ -346,7 +354,12 @@ def get_velocity(
     print(f"The velocity of cells store in 'velocity_{basis}'.")
 
     P_grid, V_grid = get_velocity_grid(
-        adata, P=position, V=adata.obsm["velocity_" + basis],grid_num=grid_num,smooth=smooth,density=density
+        adata,
+        P=position,
+        V=adata.obsm["velocity_" + basis],
+        grid_num=grid_num,
+        smooth=smooth,
+        density=density,
     )
     return P_grid, V_grid
 
@@ -391,7 +404,7 @@ def auto_get_start_cluster(adata, clusters: Optional[list] = None):
 
     Returns
     -------
-    str    
+    str
         One cluster with maximum sum of transition probabilities
     """
     if clusters == None:
@@ -432,7 +445,7 @@ def get_velocity_grid(
     Convert cell velocity to grid velocity for streamline display
 
     The visualization of vector field borrows idea from scTour: https://github.com/LiQian-XC/sctour/blob/main/sctour.
-    
+
     Parameters
     ----------
     P
@@ -508,7 +521,7 @@ class Lasso:
 
     def vi_plot(
         self,
-        basis:str="spatial",
+        basis: str = "spatial",
         cell_type: Optional[str] = None,
     ):
         """

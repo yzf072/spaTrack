@@ -8,6 +8,7 @@ from tqdm import tqdm
 from scipy.spatial.distance import cdist
 from scipy.linalg.blas import dgemm
 
+
 def update_n_merge_dict(dict1, dict2):
     dict = {
         **dict1,
@@ -15,6 +16,7 @@ def update_n_merge_dict(dict1, dict2):
     }
 
     return dict
+
 
 def norm(X, V, T, fix_velocity=True):
     Y = X + V
@@ -34,12 +36,23 @@ def norm(X, V, T, fix_velocity=True):
         np.sqrt(np.sum(np.sum(y**2, 1)) / m),
     )
 
-    X, Y, T = x / xscale, y / yscale, t / (1 / 2 * (xscale + yscale)) if T is not None else None
+    X, Y, T = (
+        x / xscale,
+        y / yscale,
+        t / (1 / 2 * (xscale + yscale)) if T is not None else None,
+    )
 
     X, V, T = X, V if fix_velocity else Y - X, T
-    norm_dict = {"xm": xm, "ym": ym, "xscale": xscale, "yscale": yscale, "fix_velocity": fix_velocity}
+    norm_dict = {
+        "xm": xm,
+        "ym": ym,
+        "xscale": xscale,
+        "yscale": yscale,
+        "fix_velocity": fix_velocity,
+    }
 
     return X, V, T, norm_dict
+
 
 def sample_by_velocity(V, n, seed=19491001):
     np.random.seed(seed)
@@ -47,6 +60,7 @@ def sample_by_velocity(V, n, seed=19491001):
     p = tmp_V / np.sum(tmp_V)
     idx = np.random.choice(np.arange(len(V)), size=n, p=p, replace=False)
     return idx
+
 
 def bandwidth_selector(X):
     """
@@ -66,11 +80,14 @@ def bandwidth_selector(X):
         _, distances = nbrs.query(X, k=max(2, int(0.2 * n)))
     else:
         alg = "ball_tree" if X.shape[1] > 10 else "kd_tree"
-        nbrs = NearestNeighbors(n_neighbors=max(2, int(0.2 * n)), algorithm=alg, n_jobs=-1).fit(X)
+        nbrs = NearestNeighbors(
+            n_neighbors=max(2, int(0.2 * n)), algorithm=alg, n_jobs=-1
+        ).fit(X)
         distances, _ = nbrs.kneighbors(X)
 
     d = np.mean(distances[:, 1:]) / 1.5
     return np.sqrt(2) * d
+
 
 def con_K(x, y, beta, method="cdist", return_d=False):
     if method == "cdist" and not return_d:
@@ -81,7 +98,9 @@ def con_K(x, y, beta, method="cdist", return_d=False):
         n = x.shape[0]
         m = y.shape[0]
 
-        D = np.matlib.tile(x[:, :, None], [1, 1, m]) - np.transpose(np.matlib.tile(y[:, :, None], [1, 1, n]), [2, 1, 0])
+        D = np.matlib.tile(x[:, :, None], [1, 1, m]) - np.transpose(
+            np.matlib.tile(y[:, :, None], [1, 1, n]), [2, 1, 0]
+        )
         K = np.squeeze(np.sum(D**2, 1))
     K = -beta * K
     K = np.exp(K)
@@ -91,11 +110,14 @@ def con_K(x, y, beta, method="cdist", return_d=False):
     else:
         return K
 
+
 def con_K_div_cur_free(x, y, sigma=0.8, eta=0.5):
     m, d = x.shape
     n, d = y.shape
     sigma2 = sigma**2
-    G_tmp = np.matlib.tile(x[:, :, None], [1, 1, n]) - np.transpose(np.matlib.tile(y[:, :, None], [1, 1, m]), [2, 1, 0])
+    G_tmp = np.matlib.tile(x[:, :, None], [1, 1, n]) - np.transpose(
+        np.matlib.tile(y[:, :, None], [1, 1, m]), [2, 1, 0]
+    )
     G_tmp = np.squeeze(np.sum(G_tmp**2, 1))
     G_tmp3 = -G_tmp / sigma2
     G_tmp = -G_tmp / (2 * sigma2)
@@ -127,6 +149,7 @@ def con_K_div_cur_free(x, y, sigma=0.8, eta=0.5):
 
     return G, df_kernel, cf_kernel
 
+
 def get_P(Y, V, sigma2, gamma, a, div_cur_free_kernels=False):
     if div_cur_free_kernels:
         Y = Y.reshape((2, int(Y.shape[0] / 2)), order="F").T
@@ -137,13 +160,18 @@ def get_P(Y, V, sigma2, gamma, a, div_cur_free_kernels=False):
     temp2 = (2 * np.pi * sigma2) ** (D / 2) * (1 - gamma) / (gamma * a)
     temp1[temp1 == 0] = np.min(temp1[temp1 != 0])
     P = temp1 / (temp1 + temp2)
-    E = P.T.dot(np.sum((Y - V) ** 2, 1)) / (2 * sigma2) + np.sum(P) * np.log(sigma2) * D / 2
+    E = (
+        P.T.dot(np.sum((Y - V) ** 2, 1)) / (2 * sigma2)
+        + np.sum(P) * np.log(sigma2) * D / 2
+    )
 
     return (P[:, None], E) if P.ndim == 1 else (P, E)
+
 
 def lstsq_solver(lhs, rhs, method="drouin"):
     C = linear_least_squares(lhs, rhs)
     return C
+
 
 def linear_least_squares(a, b, residuals=False):
     a = np.asarray(a, order="c")
@@ -154,6 +182,7 @@ def linear_least_squares(a, b, residuals=False):
         return x, np.linalg.norm(np.dot(a, x) - b)
     else:
         return x
+
 
 def SparseVFC(
     X: np.ndarray,
@@ -189,7 +218,9 @@ def SparseVFC(
     if velocity_based_sampling:
         idx = sample_by_velocity(Y[uid], M, seed=seed)
     else:
-        idx = np.random.RandomState(seed=seed).permutation(tmp_X.shape[0])  # rand select some initial points
+        idx = np.random.RandomState(seed=seed).permutation(
+            tmp_X.shape[0]
+        )  # rand select some initial points
         idx = idx[range(M)]
     ctrl_pts = tmp_X[idx, :]
 
@@ -224,7 +255,11 @@ def SparseVFC(
     C = np.zeros((M, 1)) if div_cur_free_kernels else np.zeros((M, D))
     i, tecr, E = 0, 1, 1
     # test this
-    sigma2 = sum(sum((Y - X) ** 2)) / (N * D) if div_cur_free_kernels else sum(sum((Y - V) ** 2)) / (N * D)
+    sigma2 = (
+        sum(sum((Y - X) ** 2)) / (N * D)
+        if div_cur_free_kernels
+        else sum(sum((Y - V) ** 2)) / (N * D)
+    )
     sigma2 = 1e-7 if sigma2 < 1e-8 else sigma2
     tecr_vec = np.ones(MaxIter) * np.nan
     E_vec = np.ones(MaxIter) * np.nan
@@ -241,7 +276,9 @@ def SparseVFC(
 
         P = np.maximum(P, minP)
         if div_cur_free_kernels:
-            P = np.kron(P, np.ones((int(U.shape[0] / P.shape[0]), 1)))  # np.kron(P, np.ones((D, 1)))
+            P = np.kron(
+                P, np.ones((int(U.shape[0] / P.shape[0]), 1))
+            )  # np.kron(P, np.ones((D, 1)))
             lhs = (U.T * np.matlib.tile(P.T, [M, 1])).dot(U) + lambda_ * sigma2 * K
             rhs = (U.T * np.matlib.tile(P.T, [M, 1])).dot(Y)
         else:
@@ -298,6 +335,7 @@ def SparseVFC(
 
     return VecFld
 
+
 def get_vf_dict(adata, basis="", vf_key="VecFld"):
     if basis is not None:
         if len(basis) > 0:
@@ -312,6 +350,7 @@ def get_vf_dict(adata, basis="", vf_key="VecFld"):
     vf_dict = adata.uns[vf_key]
     return vf_dict
 
+
 def vecfld_from_adata(adata, basis="", vf_key="VecFld"):
     vf_dict = get_vf_dict(adata, basis=basis, vf_key=vf_key)
 
@@ -319,6 +358,7 @@ def vecfld_from_adata(adata, basis="", vf_key="VecFld"):
     func = lambda x: vector_field_function(x, vf_dict)
 
     return vf_dict, func
+
 
 class BaseVectorField:
     def __init__(
@@ -348,6 +388,7 @@ class DifferentiableVectorField(BaseVectorField):
         # subclasses must implement this function.
         pass
 
+
 class SvcVectorField(DifferentiableVectorField):
     def __init__(self, X=None, V=None, Grid=None, *args, **kwargs):
         super().__init__(X, V, Grid)
@@ -356,7 +397,8 @@ class SvcVectorField(DifferentiableVectorField):
             self.parameters = update_n_merge_dict(
                 self.parameters,
                 {
-                    "M": kwargs.pop("M", None) or max(min([50, len(X)]), int(0.05 * len(X)) + 1),
+                    "M": kwargs.pop("M", None)
+                    or max(min([50, len(X)]), int(0.05 * len(X)) + 1),
                     # min(len(X), int(1500 * np.log(len(X)) / (np.log(len(X)) + np.log(100)))),
                     "a": kwargs.pop("a", 5),
                     "beta": kwargs.pop("beta", None),
@@ -367,7 +409,9 @@ class SvcVectorField(DifferentiableVectorField):
                     "MaxIter": kwargs.pop("MaxIter", 500),
                     "theta": kwargs.pop("theta", 0.75),
                     "div_cur_free_kernels": kwargs.pop("div_cur_free_kernels", False),
-                    "velocity_based_sampling": kwargs.pop("velocity_based_sampling", True),
+                    "velocity_based_sampling": kwargs.pop(
+                        "velocity_based_sampling", True
+                    ),
                     "sigma": kwargs.pop("sigma", 0.8),
                     "eta": kwargs.pop("eta", 0.5),
                     "seed": kwargs.pop("seed", 0),
@@ -377,7 +421,9 @@ class SvcVectorField(DifferentiableVectorField):
 
     def train(self, normalize=False, **kwargs):
         if normalize:
-            X_norm, V_norm, T_norm, norm_dict = norm(self.data["X"], self.data["V"], self.data["Grid"])
+            X_norm, V_norm, T_norm, norm_dict = norm(
+                self.data["X"], self.data["V"], self.data["Grid"]
+            )
             (self.data["X"], self.data["V"], self.data["Grid"], self.norm_dict,) = (
                 X_norm,
                 V_norm,
@@ -404,9 +450,12 @@ class SvcVectorField(DifferentiableVectorField):
         self.vf_dict["normalize"] = normalize
 
         return self.vf_dict
-    
-    def get_Jacobian(self, method="analytical", input_vector_convention="row", **kwargs):
+
+    def get_Jacobian(
+        self, method="analytical", input_vector_convention="row", **kwargs
+    ):
         return lambda x: Jacobian_rkhs_gaussian(x, self.vf_dict, **kwargs)
+
 
 def Jacobian_rkhs_gaussian(x, vf_dict, vectorize=False):
     if x.ndim == 1:
@@ -426,7 +475,10 @@ def Jacobian_rkhs_gaussian(x, vf_dict, vectorize=False):
 
     return -2 * vf_dict["beta"] * J
 
-def vector_field_function(x, vf_dict, dim=None, kernel="full", X_ctrl_ind=None, **kernel_kwargs):
+
+def vector_field_function(
+    x, vf_dict, dim=None, kernel="full", X_ctrl_ind=None, **kernel_kwargs
+):
     """vector field function constructed by sparseVFC.
     Reference: Regularized vector field learning with sparse approximation for mismatch removal, Ma, Jiayi, etc. al, Pattern Recognition
     """
@@ -448,7 +500,9 @@ def vector_field_function(x, vf_dict, dim=None, kernel="full", X_ctrl_ind=None, 
         elif kernel == "cf_kernel":
             kernel_ind = 2
         else:
-            raise ValueError(f"the kernel can only be one of {'full', 'df_kernel', 'cf_kernel'}!")
+            raise ValueError(
+                f"the kernel can only be one of {'full', 'df_kernel', 'cf_kernel'}!"
+            )
 
         K = con_K_div_cur_free(
             x,
@@ -477,6 +531,7 @@ def vector_field_function(x, vf_dict, dim=None, kernel="full", X_ctrl_ind=None, 
 
     return K
 
+
 def VectorField(
     adata: ad.AnnData,
     basis: Union[None, str] = None,
@@ -495,7 +550,9 @@ def VectorField(
     Grid = None
 
     if X is None:
-        raise Exception(f"X is None. Make sure you passed the correct X or {basis} dimension reduction method.")
+        raise Exception(
+            f"X is None. Make sure you passed the correct X or {basis} dimension reduction method."
+        )
     elif V is None:
         raise Exception("V is None. Make sure you passed the correct V.")
 
@@ -538,7 +595,7 @@ def VectorField(
         adata.obsm[key] = vf_dict["V"]
         adata.obsm[X_copy_key] = vf_dict["X"]
         adata.uns[vf_key] = vf_dict
-    
+
     control_point, inlier_prob, valid_ids = (
         "control_point_" + basis if basis is not None else "control_point",
         "inlier_prob_" + basis if basis is not None else "inlier_prob",
@@ -561,10 +618,12 @@ def VectorField(
 
     return VecFld
 
+
 def update_dict(dict1, dict2):
     dict1.update((k, dict2[k]) for k in dict1.keys() & dict2.keys())
 
     return dict1
+
 
 def angle(vector1, vector2):
     """Returns the angle in radians between given vectors"""
@@ -582,6 +641,7 @@ def angle(vector1, vector2):
         dot_p = np.dot(v1_u, v2_u)
         dot_p = min(max(dot_p, -1.0), 1.0)
         return sign * np.arccos(dot_p)
+
 
 def unit_vector(vector):
     """Returns the unit vector of the vector."""
