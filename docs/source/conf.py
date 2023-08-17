@@ -17,7 +17,6 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
-    'sphinx-rtd-theme'
 ]
 
 napoleon_numpy_docstring = True
@@ -32,6 +31,6 @@ intersphinx_mapping={
 
 # -- Options for HTML output -------------------------------------------------
 import sphinx_rtd_theme
-html_theme = 'sphinx_rtd_theme'
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_theme = "sphinx_rtd_theme"
+# html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']

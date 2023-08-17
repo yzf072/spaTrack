@@ -9,4 +9,4 @@ scipy==1.9.1
 torch>=2.0.1
 nbsphinx==0.8.12
 myst_parser==0.18.1
-sphinx-rtd-theme
+sphinx-rtd-theme==1.2.2
