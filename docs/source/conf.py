@@ -7,7 +7,7 @@ import spaTrack
 project = 'spaTrack'
 copyright = '2023, BGI'
 author = 'BGI'
-release = '0.0.1'
+release = spaTrack.__version__
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -32,5 +32,5 @@ intersphinx_mapping={
 # -- Options for HTML output -------------------------------------------------
 import sphinx_rtd_theme
 html_theme = "sphinx_rtd_theme"
-# html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
