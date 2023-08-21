@@ -12,7 +12,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import scanpy as sc
 
-from .plot_least_action_path import *
+# from .plot_least_action_path import *
 from .utils import nearest_neighbors
 
 # We caculated and visualized the LAP path along the trajectory using the corresponding functions implemented in the Dynamo.
