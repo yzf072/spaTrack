@@ -86,6 +86,8 @@ class Trainer:
         Ratio of training data.
     use_gpu, optional
         Whether to use gpu, by default True.
+    random_state
+        Random seed of numpy and torch.
     """
 
     def __init__(

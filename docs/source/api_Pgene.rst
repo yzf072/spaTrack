@@ -1,4 +1,4 @@
-Find key genes
+Pseudotime-dependent genes
 ==================================
 
 .. autofunction:: spaTrack.filter_gene

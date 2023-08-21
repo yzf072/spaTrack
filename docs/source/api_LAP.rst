@@ -7,4 +7,4 @@ Least action path
 
 .. autofunction:: spaTrack.map_cell_to_LAP
 
-.. autofunction:: plot_least_action_path
+.. autofunction:: spaTrack.plot_least_action_path

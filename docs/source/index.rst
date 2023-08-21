@@ -21,4 +21,6 @@ Welcome to spaTrack's documentation!
    :hidden:
 
    api_velocity
+   api_LAP
    api_Pgene
+   api_gr
