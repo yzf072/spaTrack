@@ -536,10 +536,30 @@ def VectorField(
     adata: ad.AnnData,
     basis: Union[None, str] = None,
     normalize: bool = False,
-    method: str = "SparseVFC",
     result_key: Union[str, None] = None,
     **kwargs,
 ):
+    """
+    Learn the function of vector filed.
+
+    Parameters
+    ----------
+    adata
+        An :class:`~anndata.AnnData` object.
+    basis
+        The label of cell coordinates, for example, `umap` or `spatial`.
+        (Default: None)
+    normalize
+        Logic flag to determine whether to normalize the data to have zero means and unit covariance.
+        (Default: False)
+
+    Returns
+    -----------
+    BaseVectorfield
+        A vector field class object.
+    """
+    method = "SparseVFC"
+    result_key = None
 
     if basis is not None:
         X = adata.obsm["X_" + basis].copy()

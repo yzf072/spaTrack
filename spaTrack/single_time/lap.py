@@ -12,7 +12,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import scanpy as sc
 
-from .vectorfield import *
+from .plot_least_action_path import *
 from .utils import nearest_neighbors
 
 # We caculated and visualized the LAP path along the trajectory using the corresponding functions implemented in the Dynamo.
@@ -42,6 +42,25 @@ def distance_point_to_segment(point, segment_start, segment_end):
 
 
 def map_cell_to_LAP(adata,basis='spatial',cell_neighbors=150):
+    """
+    Assign a new pseudotime value to each of these cells based on their position along the LAP.
+
+    Parameters
+    ----------
+    adata
+        An :class:`~anndata.AnnData` object.
+    basis
+        The embedding data.
+        (Default: 'spatial')
+    cell_neighbors
+        The number of cell neighbors.
+        (Default: 150)
+
+    Returns
+    -----------
+    tuple
+        The ptime of cells map to the LAP and selected neighbor cells. 
+    """
     LAP_points = adata.uns["LAP_"+basis]["prediction"][0]
     LAP_neighbor_cells = nearest_neighbors(LAP_points, adata.obsm["X_"+basis], n_neighbors=cell_neighbors)
     LAP_neighbor_cells = np.unique(LAP_neighbor_cells.flatten())
@@ -78,7 +97,7 @@ def map_cell_to_LAP(adata,basis='spatial',cell_neighbors=150):
         point_total_length_list.append(point_total_length)
 
     LAP_ptime = point_total_length_list / max(point_total_length_list)
-    return LAP_ptime,LAP_neighbor_cells
+    return LAP_ptime, LAP_neighbor_cells
 
 
 def log1p_(adata, X_data):
@@ -361,25 +380,60 @@ def least_action(
     adata: ad.AnnData,
     init_cells: Union[str, list],
     target_cells: Union[str, list],
-    init_states: Union[None, np.ndarray] = None,
-    target_states: Union[None, np.ndarray] = None,
-    paired: bool = True,
-    min_lap_t=False,
-    elbow_method="hessian",
-    num_t=20,
     basis: str = "umap",
     vf_key: str = "VecFld",
     vecfld: Union[None, Callable] = None,
     adj_key: str = "pearson_transition_matrix",
     n_points: int = 25,
     n_neighbors: int =100,
-    init_paths: Union[None, np.ndarray, list] = None,
-    D: int = 10,
-    PCs: Union[None, str] = None,
-    expr_func: callable = np.expm1,
-    add_key: Union[None, str] = None,
     **kwargs,
 ):
+    """
+    Calculate the optimal paths between any two cell states.
+
+    Parameters
+    ----------
+    adata
+        An :class:`~anndata.AnnData` object.
+    init_cells
+        Cell name or indices of the initial cell states.
+    target_cells
+        Cell name or indices of the terminal cell states.
+    basis
+        The embedding data used to predict the least action path.
+        (Default: "umap")
+    vf_key
+        A key to the vector field functions in adata.uns.
+        (Default: "VecFld")
+    vecfld
+        The vector field function.
+        (Default: None)
+    adj_key
+        The key to the adjacency matrix in adata.obsp.
+        (Default: "pearson_transition_matrix")
+    n_points
+        The number of points on the least action path.
+        (Default: 25)
+    n_neighbors
+        The number of neighbors.
+        (Default: 100)
+
+    Returns
+    -----------
+    LeastActionPath
+        A trajectory class containing the least action paths information.
+    """
+    init_states,target_states = None,None
+    paired = True
+    min_lap_t = False
+    elbow_method = "hessian"
+    num_t = 20
+    init_paths = None
+    D = 10
+    PCs = None 
+    expr_func: callable = np.expm1
+    add_key = None
+
     sc.pp.neighbors(adata,use_rep='X_'+basis,key_added='X_'+basis,n_neighbors=n_neighbors)
 
     if vecfld is None:
@@ -564,6 +618,34 @@ def plot_least_action_path(adata,basis='spatial',ax=None,
         point_size=6,
         linestyle='solid'
     ):
+    """
+    Plot the LAP and selected subset of cells.
+
+    Parameters
+    ----------
+    adata
+        An :class:`~anndata.AnnData` object.
+    basis
+        The embedding data used to predict the least action path.
+        (Default: 'spatial')
+    ax
+        Figure axes.
+        (Default: None)
+    linewidth
+        Linewidth of the LAP.
+        (Default: 3)
+    point_size
+        Point size of the LAP.
+        (Default: 6)
+    linestyle
+        Linestyple of the LAP.
+        (Default: 'solid')
+
+    Returns
+    -----------
+    ax
+        The plot of the LAP and cells.
+    """
     lap_dict=adata.uns['LAP_'+basis]
     id_array=np.arange(0,len(lap_dict['prediction'][0]),2)
     lap_point_pos = lap_dict['prediction'][0][id_array]

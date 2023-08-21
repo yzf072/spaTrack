@@ -28,17 +28,17 @@ pip install spaTrack
 
 We provide the following five tutorials as reference cases to illustrate the application of spaTrack in inferring cell trajectories on ST data of single slices with a single starting point and multiple starting points, as well as ST data of multiple time slices, and scRNA-seq data.
 
-1. [Apply spaTrack to infer a trajectory on spatial transcriptomic data from axolotl brain regeneration after injury.](https://spatrack-tutorials.readthedocs.io/en/latest/notebooks/01.ST_data_of_axolotl_brain_regeneration_after_injury.html)
+1. [Apply spaTrack to infer a trajectory on spatial transcriptomic data from axolotl brain regeneration after injury.](https://spatrack.readthedocs.io/en/latest/notebooks/01.ST_data_of_axolotl_brain_regeneration_after_injury.html)
 
 2. [Apply spaTrack to infer a trajectory on spatial transcriptomic data from 
-    Intrahepatic cholangiocarcinoma cancer with multiple starting points.](https://spatrack-tutorials.readthedocs.io/en/latest/notebooks/02.ST_data_of_Intrahepatic_cholangiocarcinoma_cancer.html)
+    Intrahepatic cholangiocarcinoma cancer with multiple starting points.](https://spatrack.readthedocs.io/en/latest/notebooks/02.ST_data_of_Intrahepatic_cholangiocarcinoma_cancer.html)
 
-3. [Apply spaTrack to infer a trajectory on spatial transcriptomic data from multiple time slices of axolotl brain regeneration.](https://spatrack-tutorials.readthedocs.io/en/latest/notebooks/03.ST_data_of_axolotl_brain_slides_with_multiple_times.html)
+3. [Apply spaTrack to infer a trajectory on spatial transcriptomic data from multiple time slices of axolotl brain regeneration.](https://spatrack.readthedocs.io/en/latest/notebooks/03.ST_data_of_axolotl_brain_slides_with_multiple_times.html)
 
-4. [Apply spaTrack to infer cell transitions across multiple time points in spatial transcriptomic data from the mouse midbrain.](https://spatrack-tutorials.readthedocs.io/en/latest/notebooks/04.ST_data_of_mouse%20midbrain_with_multiple_times.html)
+4. [Apply spaTrack to infer cell transitions across multiple time points in spatial transcriptomic data from the mouse midbrain.](https://spatrack.readthedocs.io/en/latest/notebooks/04.ST_data_of_mouse%20midbrain_with_multiple_times.html)
 
 5. [Apply spaTrack to infer cell  trajectory in  scRNA-seq data from 
-    hematopoietic stem cells development with multiple directions.](https://spatrack-tutorials.readthedocs.io/en/latest/notebooks/05.scRNAseq_data_of_HSC.html)
+    hematopoietic stem cells development with multiple directions.](https://spatrack.readthedocs.io/en/latest/notebooks/05.scRNAseq_data_of_HSC.html)
 
 
 

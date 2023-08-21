@@ -217,7 +217,7 @@ def get_neigh_trans(
     adata
         An :class:`~anndata.AnnData` object.
     basis
-        The basis used in visualizing the cell position
+        The basis used in visualizing the cell position.
     n_neigh_pos
         Number of neighbors based on cell positions such as spatial or umap coordinates.
         (Default: 10)
