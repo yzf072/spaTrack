@@ -11,9 +11,10 @@ from .velocity import (
 from .lap import (
     least_action,
     map_cell_to_LAP,
-    VectorField,
     plot_least_action_path,
 )
+
+from .vectorfield import VectorField
 
 from .Pgene import (
     filter_gene,
@@ -25,7 +26,6 @@ from .Pgene import (
 
 from .utils import nearest_neighbors
 
-from .gene_regulation import (
-    Trainer, )
+from .gene_regulation import Trainer
 
 __version__ = '0.0.1'
