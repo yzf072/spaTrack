@@ -1,4 +1,4 @@
-Gene_regulation
+Gene regulation
 ===============
 
 .. autoclass:: spaTrack.Trainer

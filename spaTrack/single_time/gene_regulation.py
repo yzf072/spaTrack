@@ -258,7 +258,7 @@ class Trainer:
         min_value = sorted_tensor[-(mapping_num + 1)]
 
         self.max_TF_idx = torch.nonzero(sum_all_gtf > max_value)
-        self.min_TF_idx = torch.nonzero(sum_all_gtf < min_value)
+        # self.min_TF_idx = torch.nonzero(sum_all_gtf < min_value)
 
         network_rows = []
         for i in self.max_TF_idx:
@@ -267,12 +267,12 @@ class Trainer:
             weight = sum_all_gtf[i[0].item(), i[1].item()].item()
             one_row = [TF, gene, weight]
             network_rows.append(one_row)
-        for i in self.min_TF_idx:
-            gene = self.genes[i[0].item()]
-            TF = self.tfs[i[1].item()]
-            weight = sum_all_gtf[i[0].item(), i[1].item()].item()
-            one_row = [TF, gene, weight]
-            network_rows.append(one_row)
+        # for i in self.min_TF_idx:
+        #     gene = self.genes[i[0].item()]
+        #     TF = self.tfs[i[1].item()]
+        #     weight = sum_all_gtf[i[0].item(), i[1].item()].item()
+        #     one_row = [TF, gene, weight]
+        #     network_rows.append(one_row)
 
         columns = ["TF", "gene", "weight"]
         self.network_df = pd.DataFrame(data=network_rows, columns=columns)
@@ -280,63 +280,91 @@ class Trainer:
         self.network_df.to_csv(filename, index=0)
         print(f"Weight relationships of tfs and genes are stored in {filename}.")
 
+
+    def lm(self,gene_name,TF_name):
+        gene_loc = self.genes.get_loc(gene_name)
+        TF_loc = self.tfs.get_loc(TF_name)
+
+        train_x = self.output_data[:, TF_loc]   # TF
+        train_y = self.input_data[:, gene_loc]  # gene
+
+        # zero_TF_idx=np.where(train_x==0)[0]
+
+        # train_x = np.delete(train_x,zero_TF_idx)
+        # train_y = np.delete(train_y, zero_TF_idx)
+        # print(train_x.shape,train_y.shape)
+
+        theta0=np.random.rand()
+        theta1=np.random.rand()
+
+        def f(x):
+            return theta0+theta1*x
+
+        def E(x,y):
+            return 0.5*np.sum((y-f(x))**2)
+        
+        ETA=1e-4
+        diff=1
+        count=0
+        error=E(train_x,train_y)
+        while diff>1E-2:
+            tmp0=theta0-ETA*np.sum((f(train_x)-train_y))
+            tmp1=theta1-ETA*np.sum((f(train_x)-train_y)*train_x)
+            theta0=tmp0
+            theta1=tmp1
+            current_error=E(train_x,train_y)
+            diff=error-current_error
+            error=current_error
+
+            count+=1
+        x=np.linspace(0,1,100)
+
+        plt.plot(train_x,train_y,'o',markersize=3,color='black',alpha=0.5)
+        plt.plot( x,f(x),color='#e87d72',linewidth=3)
+        plt.xlabel(TF_name,fontsize=14)
+        plt.ylabel('Dynamics of '+gene_name,fontsize=14)
+        plt.axis('equal')
+        return plt
+    
+
     def plot_scatter(
         self,
-        type: str = "raise",
-        num_rows: int = 2,
-        num_cols: int = 5,
-        fig_width: int = 20,
-        fig_height: int = 8,
+        num_rows: int = 3,
+        num_cols: int = 3,
+        fig_width: int = 10,
+        fig_height: int = 9.5,
     ) -> None:
         """
         Show the relationship between TF and gene changes through scatter plot.
 
         Parameters
         ----------
-        type
-            The displayed relationship types, include raise and drop.
-            (Default: 'raise')
         num_rows
             The number of rows in the graph.
-            (Default: 2)
+            (Default: 3)
         num_cols
             The number of columns in the graph.
-            (Default: 5)
+            (Default: 3)
         fig_width
             The width of the image.
-            (Default: 20)
+            (Default: 10)
         fig_height
             The height of the image.
-            (Default: 8)
+            (Default: 9.5)
         """
-        if self.mapping_num < (num_rows * num_cols):
-            sys.exit(
-                "Mapping_num is less than the product of num_rows and num_cols, please run again and increase the mapping_num."
-            )
-        fig, axs = plt.subplots(
-            num_rows,
-            num_cols,
-            figsize=(fig_width, fig_height),
-        )
-        for i, ax in enumerate(axs.flatten()):
-            if type == "raise":
-                gene_name = self.network_df.iloc[i]["gene"]
-                TF_name = self.network_df.iloc[i]["TF"]
-                gene_loc = self.genes.get_loc(gene_name)
-                TF_loc = self.tfs.get_loc(TF_name)
-            elif type == "drop":
-                gene_name = self.network_df.iloc[-(i + 1)]["gene"]
-                TF_name = self.network_df.iloc[-(i + 1)]["TF"]
-                gene_loc = self.genes.get_loc(gene_name)
-                TF_loc = self.tfs.get_loc(TF_name)
-            x = self.output_data[:, TF_loc]
-            y = self.input_data[:, gene_loc]
+        fig = plt.figure(figsize=(fig_width,fig_height))
 
-            ax.scatter(x, y, s=1, color="#377eb8")
-            ax.set_title(f"{TF_name}, {gene_name}")
-            # ax.set_aspect('equal')
-        # plt.tight_layout()
-        # fig.subplots_adjust(left=0.06)
+        for i in range(num_rows*num_cols):
+            row_idx=i
+            row=self.network_df.iloc[row_idx]
+            gene_name=row['gene']
+            TF_name=row['TF']
+
+            subplt = fig.add_subplot(num_rows, num_cols, i+1)
+            plot = self.lm(gene_name,TF_name)
+            # subplt.imshow(plot)
+            # subplt.axis('off')
+        fig.savefig('output.png',dpi=300)
         plt.show()
 
     def generate_data_2_time(self, cell_generate_per_time, cell_select_per_time):
