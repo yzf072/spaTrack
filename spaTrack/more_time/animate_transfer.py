@@ -16,6 +16,7 @@ def animate_transfer(
     save_path: str,  # path to save fig, "./Dorsal_result_ot/plotly_dark_1209.html"
     #group:str, ## annotation
     spatial_key:str='spatial',
+    color:list=[],
     time:str='time',
     annotation:str='celltype',
     times: Optional[List[str]] = None, # order time(start time -> end time) ['E12.5','E14.5','E16.5']
@@ -66,7 +67,10 @@ def animate_transfer(
     if times is None:
         times = df['time'].unique()
     num_times = len(times)
-    color = ['#99cfdd', '#fe3030', '#04047d', '#95c454', '#666666', '#ccc8fb', '#1c9d79', '#775613', '#b58396', '#02ffff', '#AF5F3C', '#e9c62a', '#525510', '#4fbad6',
+    if len(color)>0:
+        pass
+    else:
+        color = ['#99cfdd', '#fe3030', '#04047d', '#95c454', '#666666', '#ccc8fb', '#1c9d79', '#775613', '#b58396', '#02ffff', '#AF5F3C', '#e9c62a', '#525510', '#4fbad6',
              '#D1D1D1', '#FEB915', '#6D1A9C', '#fffe2e', '#4ec602', '#b904ab', '#4166b0', '#59BE86', '#ffd29a', '#C798EE', '#e72988', '#8eb3fb', '#767da3', '#828282']
     color_group_dict = dict(zip(set(df['annotation'].tolist()), color))
     

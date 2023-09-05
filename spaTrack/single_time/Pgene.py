@@ -350,6 +350,7 @@ def plot_trajectory_gene_heatmap(
     smooth_length:int,
     cmap_name: str ="twilight_shifted",
     gene_label_size:int =30,
+    fig_width=8,fig_height=10
 ):
     """
     Parameters
@@ -360,7 +361,8 @@ def plot_trajectory_gene_heatmap(
         length of smoothing window
     cmap_name
         Color palette
-
+    fig_width,fig_height
+        The width and height of figure
     Returns
     -------
         A heatmap plot, column-representing cells, row-representing genes.
@@ -383,8 +385,9 @@ def plot_trajectory_gene_heatmap(
     last_pd_smooth.columns = last_pd.columns
     last_pd_smooth.index = last_pd.index
 
-    fig = plt.figure(figsize=(8, 10))
-    ax1 = plt.subplot2grid((8, 10), (0, 0), colspan=10, rowspan=8)
+    #fig = plt.figure(figsize=(8, 10))
+    fig = plt.figure(figsize=(fig_width,fig_height))
+    #ax1 = plt.subplot2grid((8, 10), (0, 0), colspan=10, rowspan=8)
     pseudotime_gene_heatmap = sns.heatmap(
         last_pd_smooth,
         cmap=cmap_name,
@@ -417,7 +420,7 @@ Plot one trajectory gene
 """
 
 
-def plot_trajectory_gene(adata:AnnData, gene_name:str, line_width:int=5, show_cell_type:bool=False)->Axes:
+def plot_trajectory_gene(adata:AnnData, gene_name:str, line_width:int=5, show_cell_type:bool=False,point_size=20)->Axes:
     """
     Parameters
     ----------
@@ -429,7 +432,8 @@ def plot_trajectory_gene(adata:AnnData, gene_name:str, line_width:int=5, show_ce
         Widthe of fitting line.
     show_cell_type
         Whether to show cell type in plot.
-
+    point_size
+        The size of point
     Returns
     -------
     :class:`~matplotlib.axes.Axes`
@@ -453,16 +457,16 @@ def plot_trajectory_gene(adata:AnnData, gene_name:str, line_width:int=5, show_ce
     gam = LinearGAM(s(0, n_splines=10))
     gam_res = gam.gridsearch(x_ptime, y_exp,progress=False)
 
-    fig, axs = plt.subplots(figsize=(10, 8))
+    fig, axs = plt.subplots(figsize=(10,6))
     XX = gam_res.generate_X_grid(term=0)
     axs.plot(XX, gam.predict(XX), color="#aa4d3d", linewidth=line_width)
     if show_cell_type == True:
         sns.scatterplot(
-            x="ptime", y=gene_name, palette="deep", ax=axs, data=df_new, hue="cell_type"
+            x="ptime", y=gene_name, palette="deep", ax=axs, data=df_new,s=point_size, hue="cell_type"
         )
     else:
         sns.scatterplot(
-            x="ptime", y=gene_name, cmap="plasma", ax=axs, data=df_new, c=x_ptime
+            x="ptime", y=gene_name, cmap="plasma", ax=axs, s=point_size,data=df_new, c=x_ptime
         )
     if show_cell_type == True:
         plt.gca().legend().set_title("")
@@ -473,6 +477,14 @@ def plot_trajectory_gene(adata:AnnData, gene_name:str, line_width:int=5, show_ce
     plt.ylabel("expression", fontsize=30)
     plt.xticks(fontsize=18)
     plt.yticks(fontsize=18)
+
+    norm = plt.Normalize(df_new['ptime'].min(), df_new['ptime'].max())
+    sm = plt.cm.ScalarMappable(cmap="plasma", norm=norm)
+    sm.set_array([])
+    #axs.get_legend().remove()
+    axs.figure.colorbar(sm)
+    fig.tight_layout()
+
     return axs
 
 

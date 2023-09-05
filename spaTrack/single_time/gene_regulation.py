@@ -502,7 +502,7 @@ class Trainer:
         print(f"num of weight pairs after weight filtering: {len(df)}")
 
         df_TF = pd.Series(df["TF"].value_counts())
-        label_name = pd.Series(df_TF[df_TF > min_node_num].index).to_dict()
+        label_name = pd.Series(df_TF[df_TF >= min_node_num].index).to_dict()
         df = df.loc[df["TF"].isin(label_name.values())]
         print(f"num of weight pairs after node_count filtering: {len(df)}")
 
@@ -514,9 +514,6 @@ class Trainer:
         # size = [(degree[n]) for n in nodes]
 
         pos = nx.kamada_kawai_layout(G)
-
-        vmin = min(colors)
-        vmax = max(colors)
 
         betCent = nx.betweenness_centrality(G, normalized=True, endpoints=True)
         node_color = [2000.0 * G.degree(v) for v in G]

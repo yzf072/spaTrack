@@ -10,7 +10,7 @@ function: 3D visualization using three slices
 '''
 
 def visual_3D_mapping_3(df_concat,df_mapping_res,
-                        point_size=0.8,line_width=0.03,
+                        point_size=0.8,line_width=0.03,line_alpha=0.8,
                         cell_color_list= list(map(mpl.colors.rgb2hex, sns.color_palette('tab20b', 20)))):
 
     """
@@ -68,8 +68,8 @@ def visual_3D_mapping_3(df_concat,df_mapping_res,
         ax.scatter(x[0], y[0],z[0], c=color_cell[df_mapping_res['slice1_cluster'].iloc[i]], s=point_size/4,marker='^')
         ax.scatter(x[1], y[1],z[1],c=color_cell[df_mapping_res['slice2_cluster'].iloc[i]], s=point_size/4,marker='^')
         ax.scatter(x[2], y[2],z[2],c=color_cell[df_mapping_res['slice3_cluster'].iloc[i]], s=point_size/4,marker='^')
-        ax.plot([x[0],x[1]], [y[0],y[1]],[z[0],z[1]], linewidth=line_width,color=color_cell[df_mapping_res['slice1_cluster'].iloc[i]])
-        ax.plot([x[1],x[2]], [y[1],y[2]],[z[1],z[2]], linewidth=line_width,color=color_cell[df_mapping_res['slice2_cluster'].iloc[i]])
+        ax.plot([x[0],x[1]], [y[0],y[1]],[z[0],z[1]], linewidth=line_width,color=color_cell[df_mapping_res['slice1_cluster'].iloc[i]],alpha=line_alpha)
+        ax.plot([x[1],x[2]], [y[1],y[2]],[z[1],z[2]], linewidth=line_width,color=color_cell[df_mapping_res['slice2_cluster'].iloc[i]],alpha=line_alpha)
 
     ax.grid(False)
     ax.set_xticks([])
@@ -98,7 +98,7 @@ import seaborn as sns
 
 def visual_3D_mapping_2(df_concat,df_mapping,
                         point_size=0.8,line_width=0.03,
-                  
+                        line_alpha=0.8, 
                         cellid = 'cell_id',
                         cell_color_list= list(map(mpl.colors.rgb2hex, sns.color_palette('tab20b', 20)))):
     
@@ -158,7 +158,7 @@ def visual_3D_mapping_2(df_concat,df_mapping,
         x,y,z= distance_list,x_values, y_values
         ax.scatter(x[0], y[0],z[0], c=color_cell[df_mapping['slice1_cluster'].iloc[i]], s=point_size/4,marker='^')
         ax.scatter(x[1], y[1],z[1],c=color_cell[df_mapping['slice2_cluster'].iloc[i]], s=point_size/4,marker='^')
-        ax.plot(x, y, z, linewidth=line_width,color=color_cell[df_mapping['slice1_cluster'].iloc[i]])
+        ax.plot(x, y, z, linewidth=line_width,color=color_cell[df_mapping['slice1_cluster'].iloc[i]],alpha=line_alpha)
 
 
     ax.grid(False)

@@ -11,6 +11,7 @@ import matplotlib
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import scanpy as sc
+from sklearn.neighbors import NearestNeighbors
 
 # from .plot_least_action_path import *
 from .utils import nearest_neighbors
@@ -445,7 +446,7 @@ def least_action(
     coords = adata.obsm["X_" + basis]
 
     T = adata.obsp[adj_key]
-    G = nx.convert_matrix.from_scipy_sparse_matrix(T)
+    G = nx.from_scipy_sparse_array(T)
 
     init_states, _, _, _ = fetch_states(
         adata,
