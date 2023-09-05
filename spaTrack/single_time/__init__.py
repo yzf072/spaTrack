@@ -28,4 +28,4 @@ from .utils import nearest_neighbors
 
 from .gene_regulation import Trainer
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
