@@ -26,6 +26,7 @@ setuptools.setup(
         'numpy==1.22.4',
         'scipy==1.9.1',
         'torch>=2.0.1',
+        'pandas==1.4.3'
     ],
     python_requires='>=3.8'
 )
