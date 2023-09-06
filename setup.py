@@ -5,7 +5,7 @@ with open('README.md','r') as f:
 
 setuptools.setup(
     name='spaTrack',
-    version='0.0.3',
+    version='0.0.4',
     description='an algorithm that combine both gene expression and spot location to inference cell trajectory',
     long_description=long_description,
     classifiers=[
