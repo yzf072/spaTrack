@@ -40,5 +40,7 @@ We provide the following five tutorials as reference cases to illustrate the app
 5. [Apply spaTrack to infer cell  trajectory in  scRNA-seq data from 
     hematopoietic stem cells development with multiple directions.](https://spatrack.readthedocs.io/en/latest/notebooks/05.scRNAseq_data_of_HSC.html)
 
+# Reference
 
+[Shen, X.#, Huang, K.#, Zuo, L.#, Ye, Z.#, Li, Z., Yu, Q., Zou, X., Wei, X., Xu, P., Jin, X., Xu, X., Wu, L., Zhu, H., & Qin, P. (2023). Inferring cell trajectories of spatial transcriptomics via optimal transport analysis. bioRxiv, 2023.09.04.556175.](https://doi.org/10.1101/2023.09.04.556175)
 
