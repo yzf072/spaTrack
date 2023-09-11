@@ -29,5 +29,5 @@ setuptools.setup(
         'pandas==1.4.3',
         'nbformat>=4.2.0',
     ],
-    python_requires='>=3.8'
+    python_requires='>=3.7'
 )
