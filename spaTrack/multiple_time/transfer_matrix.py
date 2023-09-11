@@ -180,7 +180,7 @@ def pi_process(
 
 def map_data(pi,adata1,adata2):
     map_data,pi=pi_process(pi,adata1,adata2)
-    map_data['slice_1'] =pi.index
-    map_data['slice_2']=pi.idxmax(axis=1)
+    map_data['slice1'] =pi.index
+    map_data['slice2']=pi.idxmax(axis=1)
     map_data['pi_value']=pi.max(axis=1)
     return map_data
