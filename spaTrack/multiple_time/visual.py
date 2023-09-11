@@ -11,6 +11,7 @@ function: 3D visualization using three slices
 
 def visual_3D_mapping_3(df_concat,df_mapping_res,
                         point_size=0.8,line_width=0.03,line_alpha=0.8,
+                        view_axis=None,
                         cell_color_list= list(map(mpl.colors.rgb2hex, sns.color_palette('tab20b', 20)))):
 
     """
@@ -27,9 +28,11 @@ def visual_3D_mapping_3(df_concat,df_mapping_res,
             Line width between transfered cellsc
     cell_color_list: list
             Cell type color
-
+    view_axis: 'x','y'or'z'
+            Set angle of view from 'x','y' or 'z'
     """
     df_mapping_res=df_mapping_res[['slice1','slice2','slice3']]
+    df_mapping_res=df_mapping_res.reset_index(drop=True)
     plt.rcParams["figure.figsize"] = [10, 7]
     plt.rcParams["figure.autolayout"] = True
     fig = plt.figure()
@@ -78,7 +81,10 @@ def visual_3D_mapping_3(df_concat,df_mapping_res,
     ax.set_xlabel('x',fontsize=25)
     ax.set_ylabel('y',fontsize=25)
     ax.set_zlabel('z',fontsize=25)
-
+    if view_axis==None:
+        pass
+    else:
+        ax.view_init(vertical_axis=view_axis) 
 
 
 
@@ -99,7 +105,7 @@ import seaborn as sns
 def visual_3D_mapping_2(df_concat,df_mapping,
                         point_size=0.8,line_width=0.03,
                         line_alpha=0.8, 
-                        cellid = 'cell_id',
+                        view_axis=None,
                         cell_color_list= list(map(mpl.colors.rgb2hex, sns.color_palette('tab20b', 20)))):
     
     """
@@ -116,7 +122,8 @@ def visual_3D_mapping_2(df_concat,df_mapping,
             Line width between transfered cellsc
     cell_color_list: list
             Cell type color
-
+    view_axis: 'x','y'or'z'
+            Set angle of view from 'x','y' or 'z'
     """
  
     plt.rcParams["figure.figsize"] = [10, 7]
@@ -124,6 +131,7 @@ def visual_3D_mapping_2(df_concat,df_mapping,
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
     df_mapping.columns=['slice1','slice2']
+    df_mapping=df_mapping.reset_index(drop=True)
     cell_type_col_name=df_concat.columns[1]
     for slice_id in df_mapping.columns:   
 
@@ -168,3 +176,8 @@ def visual_3D_mapping_2(df_concat,df_mapping,
     ax.set_xlabel('x',fontsize=25)
     ax.set_ylabel('y',fontsize=25)
     ax.set_zlabel('z',fontsize=25)
+
+    if view_axis==None:
+        pass
+    else:
+        ax.view_init(vertical_axis=view_axis)
