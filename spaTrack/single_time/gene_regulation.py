@@ -71,7 +71,7 @@ class Trainer:
     tfs_path
         The path of the tf names file.
     cell_mapping_path
-        The path of the cell mapping file, where column `slice_1` indicates the start cell and column `slice_2` indicates the end cell.
+        The path of the cell mapping file, where column `slice1` indicates the start cell and column `slice2` indicates the end cell.
     ptime_path
         The path of the ptime file, used to determine the sequence of the ptime data.
     min_cells, optional
@@ -159,8 +159,8 @@ class Trainer:
             sc.pp.filter_genes(self.adata2, min_cells=min_cells[1], inplace=True)
 
             # only use the mapping cells
-            self.adata1 = self.adata1[self.cell_mapping.slice_1]
-            self.adata2 = self.adata2[self.cell_mapping.slice_2]
+            self.adata1 = self.adata1[self.cell_mapping.slice1]
+            self.adata2 = self.adata2[self.cell_mapping.slice2]
 
             # get same genes
             same_genes = list(self.adata1.var_names & self.adata2.var_names)
