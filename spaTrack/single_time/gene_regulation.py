@@ -75,7 +75,7 @@ class Trainer:
     ptime_path
         The path of the ptime file, used to determine the sequence of the ptime data.
     min_cells, optional
-        The minimum number of cells for gene filtration, by default 100.
+        The minimum number of cells for gene filtration.
     cell_divide_per_time, optional
         The cell number generated at each time point using the meta-analysis method, by default 500.
     cell_select_per_time, optional
@@ -97,7 +97,7 @@ class Trainer:
         tfs_path: str,
         cell_mapping_path: str = None,
         ptime_path: str = None,
-        min_cells: Union[int, List[int]] = 100,
+        min_cells: Union[int, List[int]] = None,
         cell_divide_per_time: int = 80,
         cell_select_per_time: int = 10,
         cell_generate_per_time: int = 500,
@@ -126,6 +126,9 @@ class Trainer:
             self.adata.obs["ptime"] = pd.read_table(ptime_path, index_col=0)
             self.tfs_path = tfs_path
 
+            if min_cells == None:
+                min_cells = round(self.adata.n_obs*0.3)
+
             # filter out genes expressed in few cells
             sc.pp.filter_genes(self.adata, min_cells=min_cells, inplace=True)
             print(f"Genes expressed in less than {min_cells} cells have been filtered.")
@@ -150,6 +153,8 @@ class Trainer:
             self.tfs_path = tfs_path
 
             # filter genes
+            if min_cells == None:
+                min_cells = [round(self.adata1.n_obs*0.3),round(self.adata2.n_obs*0.3)]
             if type(min_cells) != list or len(min_cells) != 2:
                 sys.exit(
                     "In 2_time mode, you should provide a list contains two min_cells parameters to filter two adata files."
@@ -203,6 +208,7 @@ class Trainer:
         iter_times: int = 30,
         mapping_num: int = 3000,
         filename: str = "weights.csv",
+        lr_ratio: float = 0.1
     ) -> None:
         """
         Run the trainer.
@@ -216,7 +222,7 @@ class Trainer:
             The number of iterations for each training model, by default 30.
             (Default: 30)
         mapping_num
-            The number of mapping weight pairs.
+            The number of top weight pairs you want to extract.
             (Default: 3000)
         filename
             The saved file name.
@@ -230,7 +236,7 @@ class Trainer:
                 pbar.set_description(f"Train {i + 1}")
                 self.model = Model(len(self.genes), len(self.tfs)).to(self.device)
                 loss_fn = nn.MSELoss()
-                optimizer = torch.optim.SGD(self.model.parameters(), lr=0.1)
+                optimizer = torch.optim.SGD(self.model.parameters(), lr=lr_ratio)
 
                 for t in range(iter_times):
                     train_loss = self.train(
@@ -254,8 +260,12 @@ class Trainer:
         # save most important maps
         flat_tensor = torch.flatten(sum_all_gtf)
         sorted_tensor, _ = torch.sort(flat_tensor, descending=True)
+        if len(sorted_tensor) <= mapping_num:
+            mapping_num = len(sorted_tensor) - 1
+            print(f"Only got {mapping_num+1} pairs of weights.")
+
         max_value = sorted_tensor[mapping_num]
-        min_value = sorted_tensor[-(mapping_num + 1)]
+        # min_value = sorted_tensor[-(mapping_num + 1)]
 
         self.max_TF_idx = torch.nonzero(sum_all_gtf > max_value)
         # self.min_TF_idx = torch.nonzero(sum_all_gtf < min_value)
