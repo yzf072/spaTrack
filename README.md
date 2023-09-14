@@ -20,6 +20,8 @@ spaTrack has the potential to capture fine local details of trajectory within a 
 
 # Installation
 
+Required python version: **3.7** to **3.10**
+
 ```shell
 pip install spaTrack
 ```
