@@ -12,6 +12,7 @@ import statsmodels.stats as stat
 from scipy.signal import savgol_filter
 import statsmodels.formula.api as smf
 import scipy.stats
+from scipy import sparse
 import gc
 from anndata import AnnData
 from matplotlib.axes import Axes
@@ -105,6 +106,8 @@ def filter_gene(adata: AnnData, min_exp_prop: float, hvg_gene: int = 2000)->AnnD
                                        ]).mean().sort_values(["ptime"]).index
     print("clusters ordered by ptime: ", list(cluster_order))
     ptime_sort_matrix = adata.X.copy()
+    if type(ptime_sort_matrix) == sparse._csr.csr_matrix:
+        ptime_sort_matrix = ptime_sort_matrix.toarray()
     df_exp = pd.DataFrame(data=ptime_sort_matrix,
                           index=adata.obs.index,
                           columns=adata.var.index)
