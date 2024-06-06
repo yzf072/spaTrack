@@ -24,6 +24,7 @@ def get_ot_matrix(
     alpha1: int = 1,
     alpha2: int = 1,
     random_state: Union[None, int, RandomState] = 0,
+    n_pcs: int = 50,
 ) -> np.ndarray:
     """
     Calculate transfer probabilities between cells.
@@ -58,7 +59,7 @@ def get_ot_matrix(
     if "X_pca" not in adata.obsm:
         print("X_pca is not in adata.obsm, automatically do PCA first.")
         sc.tl.pca(adata, svd_solver="arpack", random_state=random_state)
-    newdata = adata.obsm["X_pca"]
+    newdata = adata.obsm["X_pca"][:,:n_pcs]
     newdata2 = newdata.copy()
 
     if data_type == "spatial":

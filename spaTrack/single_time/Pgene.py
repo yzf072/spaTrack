@@ -485,7 +485,7 @@ def plot_trajectory_gene(adata:AnnData, gene_name:str, line_width:int=5, show_ce
     sm = plt.cm.ScalarMappable(cmap="plasma", norm=norm)
     sm.set_array([])
     #axs.get_legend().remove()
-    axs.figure.colorbar(sm)
+    axs.figure.colorbar(sm,ax=axs)
     fig.tight_layout()
 
     return axs
