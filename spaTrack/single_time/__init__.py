@@ -24,6 +24,12 @@ from .Pgene import (
     plot_trajectory_gene,
 )
 
+from .start_cluster import (
+
+   assess_start_cluster,
+   assess_start_cluster_plot
+   )
+
 from .utils import nearest_neighbors
 
 from .gene_regulation import Trainer
