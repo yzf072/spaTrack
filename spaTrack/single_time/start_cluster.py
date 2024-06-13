@@ -117,8 +117,6 @@ def assess_start_cluster_plot(adata):
     ----------
     adata
         Anndata
-    palette_name
-        boxplot color
 
     Returns
     -------
