@@ -13,7 +13,7 @@ import plotly.graph_objs as go
 import plotly.offline as py
 from ipywidgets import VBox
 import seaborn as sns
-from typing import Optional, Union, Literal, Tuple, List
+from typing import Optional, Union, Literal, Tuple
 
 from .utils import nearest_neighbors, kmeans_centers
 
@@ -21,9 +21,10 @@ from .utils import nearest_neighbors, kmeans_centers
 def get_ot_matrix(
     adata: AnnData,
     data_type: str,
-    alpha1: int = 1,
-    alpha2: int = 1,
+    alpha1: int = 0.5,
+    alpha2: int = 0.5,
     random_state: Union[None, int, RandomState] = 0,
+    pattern: Literal["run", "test", "test2"] = "run",
     n_pcs: int = 50,
 ) -> np.ndarray:
     """
@@ -43,13 +44,16 @@ def get_ot_matrix(
 
     alpha1
         The proportion of spatial location information.
-        (Default: 1)
+        (Default: 0.5)
     alpha2
         The proportion of gene expression information.
-        (Default: 1)
+        (Default: 0.5)
     random_state
         Different initial states for the pca.
         (Default: 0)
+    n_pcs
+        The number of used pcs.
+        (Default: 50)
 
     Returns
     -------
@@ -59,36 +63,91 @@ def get_ot_matrix(
     if "X_pca" not in adata.obsm:
         print("X_pca is not in adata.obsm, automatically do PCA first.")
         sc.tl.pca(adata, svd_solver="arpack", random_state=random_state)
-    newdata = adata.obsm["X_pca"][:,:n_pcs]
+    newdata = adata.obsm["X_pca"][:, :n_pcs]
     newdata2 = newdata.copy()
 
-    if data_type == "spatial":
-        newcoor = adata.obsm["X_spatial"]
-        newcoor2 = newcoor.copy()
+    def getM(alpha1, alpha2):
+        if data_type == "spatial":
+            newcoor = adata.obsm["X_spatial"]
+            newcoor2 = newcoor.copy()
 
-        # calculate physical distance
-        ed_coor = euclidean_distances(newcoor, newcoor2, squared=True)
-        m1 = ed_coor / sum(sum(ed_coor))
-        # calculate gene expression PCA space distance
-        ed_gene = euclidean_distances(newdata, newdata2, squared=True)
-        m2 = ed_gene / sum(sum(ed_gene))
+            # calculate physical distance
+            ed_coor = euclidean_distances(newcoor, newcoor2, squared=True)
+            m1 = ed_coor / sum(sum(ed_coor))
+            # calculate gene expression PCA space distance
+            ed_gene = euclidean_distances(newdata, newdata2, squared=True)
+            m2 = ed_gene / sum(sum(ed_gene))
 
-        M = alpha1 * m1 + alpha2 * m2
-        M /= M.max()
-        row, col = np.diag_indices_from(M)
-        M[row, col] = M.max() * 1000000
+            M = alpha1 * m1 + alpha2 * m2
+            M /= M.max()
 
-    elif data_type == "single-cell":
-        ed = euclidean_distances(newdata, newdata2, squared=True)
-        M = ed / sum(sum(ed))
-        M /= M.max()
-        row, col = np.diag_indices_from(M)
-        M[row, col] = M.max() * 1000000
+        elif data_type == "single-cell":
+            ed = euclidean_distances(newdata, newdata2, squared=True)
+            M = ed / sum(sum(ed))
+            M /= M.max()
 
-    else:
-        sys.exit(
-            "Please give the right data type, choose from 'spatial' or 'single-cell'."
+        else:
+            sys.exit(
+                "Please give the right data type, choose from 'spatial' or 'single-cell'."
+            )
+
+        return M
+
+    if pattern == "run":
+        print(
+            f"alpha1(spatial information): {alpha1}   alpha2(gene expression): {alpha2}"
         )
+        M = getM(alpha1, alpha2)
+    elif pattern == "test":
+        alpha1 = autoAlpha1 = 0
+        autoM = None
+        minSumM = float("inf")
+
+        while alpha1 <= 1.0 + 0.1 / 2:
+            alpha1 = round(alpha1, 1)
+            # print(alpha1)
+            alpha2 = 1 - alpha1
+            M = getM(alpha1, alpha2)
+
+            sumM = np.sum(M)
+            print(sumM)
+            if sumM < minSumM:
+                minSumM = sumM
+                autoAlpha1 = alpha1
+                autoM = M
+
+            alpha1 += 0.1
+        print(
+            f"auto alpha1(spatial information) = {autoAlpha1}   auto alpha2(gene expression) = {1-autoAlpha1}"
+        )
+        M = autoM
+    elif pattern == "test2":
+        alpha1 = autoAlpha1 = 0
+        autoM = None
+        maxSumM = 0
+
+        while alpha1 <= 1.0 + 0.1 / 2:
+            alpha1 = round(alpha1, 1)
+            # print(alpha1)
+            alpha2 = 1 - alpha1
+            M = getM(alpha1, alpha2)
+
+            sumM = np.sum(M)
+            # print(sumM)
+            if sumM > maxSumM:
+                maxSumM = sumM
+                autoAlpha1 = alpha1
+                autoM = M
+
+            alpha1 += 0.1
+        print(
+            f"auto alpha1(spatial information) = {autoAlpha1}   auto alpha2(gene expression) = {1-autoAlpha1}"
+        )
+        M = autoM
+
+    # Set the diagonal elements to large values
+    row, col = np.diag_indices_from(M)
+    M[row, col] = M.max() * 1000
 
     a, b = (
         np.ones((adata.n_obs,)) / adata.n_obs,
@@ -145,7 +204,7 @@ def set_start_cells(
     if select_way == "coordinates":
         if start_point is None:
             raise ValueError(
-                f"`start_point` must be specified in the 'coordinates' mode."
+                "`start_point` must be specified in the 'coordinates' mode."
             )
 
         start_cells = nearest_neighbors(start_point, adata.obsm["X_" + basis], n_neigh)[
@@ -162,7 +221,7 @@ def set_start_cells(
 
         start_cells = np.where(adata.obs["cluster"] == cell_type)[0]
 
-        if split == True:
+        if split:
             mask = adata.obs["cluster"] == cell_type
             cell_coords = adata.obsm["X_" + basis][mask]
             cluster_centers = kmeans_centers(cell_coords, n_clusters=n_clusters)
@@ -173,7 +232,7 @@ def set_start_cells(
                 cluster_centers, select_cluster_coords, n_neigh
             ).flatten()
     else:
-        raise ValueError(f"`select_way` must choose from 'coordinates' or 'cell_type'.")
+        raise ValueError("`select_way` must choose from 'coordinates' or 'cell_type'.")
 
     return list(start_cells)
 
@@ -408,7 +467,7 @@ def auto_get_start_cluster(adata, clusters: Optional[list] = None):
     str
         One cluster with maximum sum of transition probabilities
     """
-    if clusters == None:
+    if clusters is None:
         clusters = np.unique(adata.obs["cluster"])
     cluster_prob_sum = {}
     for cluster in clusters:
