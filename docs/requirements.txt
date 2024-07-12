@@ -12,3 +12,8 @@ myst_parser==0.18.1
 sphinx-rtd-theme==1.2.2
 pandas==1.4.3
 nbformat>=4.2.0
+spreg==1.2.4
+spglm==1.0.8
+mapclassify==2.4.3
+pysal==2.6.0
+
