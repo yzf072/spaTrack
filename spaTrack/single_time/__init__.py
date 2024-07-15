@@ -6,6 +6,7 @@ from .velocity import (
     Lasso,
     auto_get_start_cluster,
     get_velocity_grid,
+    auto_estimate_para,
 )
 
 from .lap import (

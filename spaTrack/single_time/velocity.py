@@ -1,21 +1,29 @@
-import ot
+# from multiprocessing import Pool
+import multiprocessing as mp
 import sys
-import scanpy as sc
-import pandas as pd
+from typing import Literal, Optional, Tuple, Union
+
+import matplotlib.pyplot as plt
 import numpy as np
-from anndata import AnnData
-from sklearn.metrics.pairwise import euclidean_distances
-from sklearn.neighbors import NearestNeighbors
-from scipy.sparse import csr_matrix
-from scipy.stats import norm
-from numpy.random import RandomState
+import ot
+import pandas as pd
 import plotly.graph_objs as go
 import plotly.offline as py
-from ipywidgets import VBox
+import scanpy as sc
 import seaborn as sns
-from typing import Optional, Union, Literal, Tuple
+from anndata import AnnData
+from ipywidgets import VBox
+from numpy.random import RandomState
+from pysal.explore import esda
+from pysal.lib import weights
+from scipy import stats
+from scipy.sparse import csr_matrix
+from scipy.stats import fisher_exact, norm
+from sklearn import preprocessing
+from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.neighbors import NearestNeighbors
 
-from .utils import nearest_neighbors, kmeans_centers
+from .utils import kmeans_centers, nearest_neighbors
 
 
 def get_ot_matrix(
@@ -157,6 +165,42 @@ def get_ot_matrix(
     Gs = np.array(ot.sinkhorn(a, b, M, lambd))
 
     return Gs
+
+
+def auto_estimate_para(adata, hvg_gene_number=2000):
+    """
+    Parameters
+    ----------
+    adata
+        anndata.AnnData object.
+    n_top_genes
+         highly variable expression gene number (Default: 2000)
+
+    """
+    ## 01 Average expression value of highly variable genes in each spot
+    sc.pp.highly_variable_genes(
+        adata, min_mean=0.0125, max_mean=3, min_disp=0.5, n_top_genes=hvg_gene_number
+    )
+    df_hvg = pd.DataFrame(adata[:, adata.var[adata.var["highly_variable"]].index].X)
+    df_hvg = pd.DataFrame(df_hvg.mean(axis=1))
+    df_hvg.columns = ["hvg"]
+
+    ## 02 measure alpah1  and alpah2 using moran I
+    df_hvg["x"] = adata.obsm["X_spatial"][:, 0]
+    df_hvg["y"] = adata.obsm["X_spatial"][:, 1]
+    xy_array = np.hstack(
+        [np.array(df_hvg["x"]).reshape(-1, 1), np.array(df_hvg["y"]).reshape(-1, 1)]
+    )
+    w_xy = weights.KNN(xy_array, k=10)
+
+    hvg_exp = np.array(df_hvg["hvg"])
+    moran_res = esda.Moran(hvg_exp, w_xy)
+    a1 = 0.5 + (moran_res.I.round(3))
+    a2 = 1 - a1
+    a2 = a2.round(3)
+    print("Parameter estimation of alpah1 for gene expression is:", a1.round(3))
+    print("Parameter estimation of alpah2 for distance is:", a2)
+    return a1, a2
 
 
 def set_start_cells(
