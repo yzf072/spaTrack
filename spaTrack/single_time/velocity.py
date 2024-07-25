@@ -195,11 +195,10 @@ def auto_estimate_para(adata, hvg_gene_number=2000):
 
     hvg_exp = np.array(df_hvg["hvg"])
     moran_res = esda.Moran(hvg_exp, w_xy)
-    a1 = 0.5 + (moran_res.I.round(3))
-    a2 = 1 - a1
-    a2 = a2.round(3)
-    print("Parameter estimation of alpah1 for gene expression is:", a1.round(3))
-    print("Parameter estimation of alpah2 for distance is:", a2)
+    a1=0.5
+    a2 = 0.5 + (moran_res.I.round(3)/2)
+    print("Parameter estimation of alpah1 for spatial distance is:", a1)
+    print("Parameter estimation of alpah2 for gene expression is:", a2.round(3))
     return a1, a2
 
 
