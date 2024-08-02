@@ -18,6 +18,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         'pot>=0.9.0',
+        'pysal<=2.6.0',
         'scanpy>=1.9.3',
         'plotly>=5.15.0',
         'ipywidgets>=8.0.7',
