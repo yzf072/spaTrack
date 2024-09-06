@@ -20,6 +20,7 @@ from scipy import stats
 from scipy.sparse import csr_matrix
 from scipy.stats import fisher_exact, norm
 from sklearn import preprocessing
+from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.neighbors import NearestNeighbors
 
@@ -201,6 +202,79 @@ def auto_estimate_para(adata, hvg_gene_number=2000):
     print("Parameter estimation of alpah2 for gene expression is:", a2.round(3))
     return a1, a2
 
+
+def calc_alpha_by_moransI(adata,):
+
+    def moransI(coords, bandwidth, x, w_type="Binary"):
+        distances = np.linalg.norm(coords - coords[:, np.newaxis], axis=2)
+        dij = distances.copy()
+
+        obs = len(x)
+
+        if bandwidth >= obs:
+            bandwidth = obs - 1
+            print(f"Bandwidth set to: {bandwidth}")
+
+        moran_nom = 0.0
+        moran_denom = 0.0
+        mean_x = np.mean(x)
+
+        wts = np.zeros((obs, obs))
+
+        for i in range(obs):
+            # Get the data and add the distances
+            data_set = np.column_stack((x, dij[:, i]))
+
+            # Sort by distance
+            data_set_sorted = data_set[data_set[:, 1].argsort()]
+
+            # Keep nearest neighbours
+            sub_set1 = data_set_sorted[1 : (bandwidth + 1), :]
+
+            # Find furthest neighbour
+            kernel_h = np.max(sub_set1[:, 1])
+
+            # Calculate weights
+            for j in range(obs):
+                if data_set[j, 1] > kernel_h:
+                    wts[i, j] = 0
+                else:
+                    wts[i, j] = 1
+
+                if j != i:
+                    moran_nom += wts[i, j] * (x[i] - mean_x) * (x[j] - mean_x)
+
+            moran_denom += (x[i] - mean_x) * (x[i] - mean_x)
+
+        np.fill_diagonal(wts, 0)
+        sum_w = np.sum(wts)
+
+        nom = obs * moran_nom
+        denom = sum_w * moran_denom
+
+        morans_i = nom / denom
+        if morans_i > 1:
+            morans_i = 1
+        if morans_i < -1:
+            morans_i = -1
+        return morans_i
+    
+    pca = PCA(n_components=10)
+    pca.fit(adata.X.T)
+    pca2=pca.components_
+
+    mi2 = []
+    for i in range(10):# range num = Number of PCs
+        mi = moransI(adata.obsm['X_spatial'], 8, pca2[i])  # 计算每个pc的moran i
+        mi2.append(mi)
+
+    var_w=pca.explained_variance_ratio_
+    result = np.sum(np.array(var_w) * np.array(mi2))
+
+    alpha1 = 1/(1+result)
+    alpha2 = 1-alpha1
+    print(f"According to the Morans'I algorithm, the estimated values of alpha1 and alpha are {alpha1} and {alpha2}.")
+    return alpha1, alpha2
 
 def set_start_cells(
     adata: AnnData,

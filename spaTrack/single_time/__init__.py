@@ -7,6 +7,7 @@ from .velocity import (
     auto_get_start_cluster,
     get_velocity_grid,
     auto_estimate_para,
+    calc_alpha_by_moransI,
 )
 
 from .lap import (
