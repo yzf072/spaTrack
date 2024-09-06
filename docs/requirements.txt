@@ -12,4 +12,4 @@ myst_parser==0.18.1
 sphinx-rtd-theme==1.2.2
 pandas==1.4.3
 nbformat>=4.2.0
-pysal==24.1
+pysal==2.6.0
