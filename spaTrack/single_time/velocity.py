@@ -52,10 +52,10 @@ def get_ot_matrix(
         - ``'single-cell'``: for the single-cell sequencing data.
 
     alpha1
-        The proportion of spatial location information.
+        The proportion of gene expression information.
         (Default: 0.5)
     alpha2
-        The proportion of gene expression information.
+        The proportion of spatial location information.
         (Default: 0.5)
     random_state
         Different initial states for the pca.
@@ -87,7 +87,7 @@ def get_ot_matrix(
             ed_gene = euclidean_distances(newdata, newdata2, squared=True)
             m2 = ed_gene / sum(sum(ed_gene))
 
-            M = alpha1 * m1 + alpha2 * m2
+            M = alpha2 * m1 + alpha1 * m2
             M /= M.max()
 
         elif data_type == "single-cell":
@@ -104,7 +104,7 @@ def get_ot_matrix(
 
     if pattern == "run":
         print(
-            f"alpha1(spatial information): {alpha1}   alpha2(gene expression): {alpha2}"
+            f"alpha1(gene expression): {alpha1}   alpha2(spatial information): {alpha2}"
         )
         M = getM(alpha1, alpha2)
     elif pattern == "test":
@@ -127,7 +127,7 @@ def get_ot_matrix(
 
             alpha1 += 0.1
         print(
-            f"auto alpha1(spatial information) = {autoAlpha1}   auto alpha2(gene expression) = {1-autoAlpha1}"
+            f"auto alpha1(gene expression) = {autoAlpha1}   auto alpha2(spatial information) = {1-autoAlpha1}"
         )
         M = autoM
     elif pattern == "test2":
@@ -150,7 +150,7 @@ def get_ot_matrix(
 
             alpha1 += 0.1
         print(
-            f"auto alpha1(spatial information) = {autoAlpha1}   auto alpha2(gene expression) = {1-autoAlpha1}"
+            f"auto alpha1(gene expression) = {autoAlpha1}   auto alpha2(spatial information) = {1-autoAlpha1}"
         )
         M = autoM
 
@@ -198,8 +198,8 @@ def auto_estimate_para(adata, hvg_gene_number=2000):
     moran_res = esda.Moran(hvg_exp, w_xy)
     a1=0.5
     a2 = 0.5 + (moran_res.I.round(3)/2)
-    print("Parameter estimation of alpah1 for spatial distance is:", a1)
-    print("Parameter estimation of alpah2 for gene expression is:", a2.round(3))
+    print("Parameter estimation of alpah1 for gene expression is:", a1)
+    print("Parameter estimation of alpah2 for spatial distance is:", a2.round(3))
     return a1, a2
 
 
@@ -273,7 +273,7 @@ def calc_alpha_by_moransI(adata,):
 
     alpha1 = 1/(1+result)
     alpha2 = 1-alpha1
-    print(f"According to the Morans'I algorithm, the estimated values of alpha1 and alpha are {alpha1} and {alpha2}.")
+    print(f"Morans'I value is {result}, the estimated values of alpha1 and alpha2 are {alpha1} and {alpha2}.")
     return alpha1, alpha2
 
 def set_start_cells(
