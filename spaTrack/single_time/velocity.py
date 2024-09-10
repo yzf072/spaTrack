@@ -725,8 +725,8 @@ class Lasso:
         df = pd.DataFrame()
         df["group_ID"] = self.adata.obs_names
         df["labels"] = self.adata.obs["cluster"].values
-        df["spatial_0"] = self.adata.obsm["X_" + basis][:, 0]
-        df["spatial_1"] = self.adata.obsm["X_" + basis][:, 1]
+        df["spatial_0"] = self.adata.obsm[basis][:, 0]
+        df["spatial_1"] = self.adata.obsm[basis][:, 1]
         df["color"] = df.labels.map(self.adata.uns["cluster_color"])
 
         py.init_notebook_mode()
