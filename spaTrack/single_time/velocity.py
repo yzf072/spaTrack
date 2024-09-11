@@ -271,7 +271,7 @@ def calc_alpha_by_moransI(adata,):
     var_w=pca.explained_variance_ratio_
     result = np.sum(np.array(var_w) * np.array(mi2))
 
-    alpha1 = 1/(1+result)
+    alpha1 = 1/(1+abs(result))
     alpha2 = 1-alpha1
     print(f"Morans'I value is {result}, the estimated values of alpha1 and alpha2 are {alpha1} and {alpha2}.")
     return alpha1, alpha2
