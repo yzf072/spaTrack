@@ -1,4 +1,4 @@
-
+[![DOI](https://zenodo.org/badge/605859353.svg)](https://doi.org/10.5281/zenodo.14214597)
 # Introduction
 
 Trajectory inference (TI) provides important insights in understanding cell development and biological process. However, the integration of transcriptomic profiles and spatial locations to organize spatiotemporal cell orders is currently remaining challenges. Here we introduce spaTrack, which effectively constructs cell trajectories from an optimal-transport matrix at single cell resolution, taking into account both profile of gene expression and distance cost of cell transition in a spatial context. 
