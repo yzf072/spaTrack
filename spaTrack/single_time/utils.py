@@ -27,7 +27,7 @@ def kmeans_centers(coords: np.ndarray, n_clusters: int = 2) -> np.ndarray:
         Centers of clusters.
     """
     cell_coordinates = coords
-    kmeans = KMeans(n_clusters)
+    kmeans = KMeans(n_clusters, random_state=8)
     kmeans.fit(cell_coordinates)
     cluster_centers = kmeans.cluster_centers_
     print("kmeans cluster centers:")
