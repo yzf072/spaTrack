@@ -44,5 +44,5 @@ We provide the following five tutorials as reference cases to illustrate the app
 
 # Reference
 
-[Shen, X.#, Huang, K.#, Zuo, L.#, Ye, Z.#, Li, Z., Yu, Q., Zou, X., Wei, X., Xu, P., Jin, X., Xu, X., Wu, L., Zhu, H., & Qin, P. (2023). Inferring cell trajectories of spatial transcriptomics via optimal transport analysis. bioRxiv, 2023.09.04.556175.](https://doi.org/10.1101/2023.09.04.556175)
+[Shen, X. *, Zuo, L. *, Ye, Z. *, Yuan, Z. *, Huang, K., Li, Z., Yu, Q., Zou, X., Wei, X., Xu, P., Deng, Y., Jin, X., Xu, X. #, Wu, L. #, Zhu, H. #, & Qin, P. # (2025). Inferring cell trajectories of spatial transcriptomics via optimal transport analysis. Cell Systems, 16(2), 101194.](https://doi.org/10.1016/j.cels.2025.101194)
 
